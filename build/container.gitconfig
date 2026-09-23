@@ -1,0 +1,30 @@
+# Git configuration for the IN-CONTAINER test run only.
+#
+# Passed as GIT_CONFIG_GLOBAL by build/tasks/Test.build.ps1. It is NOT baked into either image:
+# the leash image is the product, not a test fixture, and it has no business carrying a git
+# exception that exists so a suite can run against a bind mount.
+#
+# WHY THIS FILE EXISTS AT ALL
+#
+# /work is a bind mount, so every file in it carries the HOST uid rather than the container's.
+# git refuses to operate in a repository owned by another user - "detected dubious ownership",
+# exit 128 - which took the BeforeAll of every git-dependent suite down with it and read as 25
+# failures rather than as one configuration problem.
+#
+# WHY NOT GIT_CONFIG_COUNT/KEY/VALUE, WHICH WAS TRIED FIRST
+#
+# Those arrive in git's "command line" scope. That is enough for ordinary commands - it fixed
+# `git rev-parse --show-toplevel` - but `git clone /work ...` still refused, and
+# `git config --list --show-origin` shows why it is not a mystery: the entries are present and
+# simply not honoured for that path. safe.directory is deliberately restricted in which scopes
+# it may come from, so that an ad-hoc `-c` cannot switch the protection off. A global config
+# file is a scope it is honoured from.
+#
+# WHY TWO ENTRIES AND NOT `directory = *`
+#
+# The wildcard would cover every repository on the machine to buy a fix for one. `git clone`
+# resolves the gitdir and checks ownership on /work/.git as well as /work, so both are named
+# explicitly and nothing else is.
+[safe]
+	directory = /work
+	directory = /work/.git

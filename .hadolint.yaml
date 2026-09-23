@@ -1,0 +1,7 @@
+# Waivers that reflect deliberate image design, not oversight.
+# DL3008 (unpinned apt) is waived inline on the apt layer only — see Dockerfile.
+ignored:
+  # Separate RUN layers are kept for readability and cache granularity.
+  - DL3059
+  # The runtime user is named `claude` on purpose; a numeric UID is a later change.
+  - DL3066

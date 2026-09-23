@@ -1,0 +1,114 @@
+{
+  "schema": "claude.build.contracts/1",
+  "generated": "2026-09-21",
+  "source": "docs/plans/2026-09-21-oneshot/ASSESSMENT.md",
+  "siblings": [
+    {
+      "id": "policy",
+      "status": "proposed",
+      "consumes": ["config/policy.json", "config/patterns.json"],
+      "emits": ["deny set", "allow set", "managed-settings fragment", "hook decision JSON"],
+      "gates": "PreToolUse rules",
+      "evidence": [],
+      "notes": "config/policy.json does not exist. The deny set is currently a literal in nine places; see ASSESSMENT.md section 1.11. Nothing generates either managed-settings.json today; both copies are hand-maintained and cross-asserted by tests."
+    },
+    {
+      "id": "sentinel",
+      "status": "known",
+      "consumes": ["gated tool list", "PreToolUse stdin payload", "LEASH_MODE", "LEDGER_PRINCIPAL"],
+      "emits": ["hookSpecificOutput.permissionDecision plus exit code", "one Ledger receipt per decision"],
+      "gates": "the tool call",
+      "evidence": [
+        "hooks/sentinel.ps1:73 gated tool list",
+        "hooks/sentinel.ps1 Exit-Closed is the only exit-2 path",
+        "tests/Sentinel.Tests.ps1:68 Enforce, :141 Observe, :164 fails closed"
+      ],
+      "notes": "Deny is hookSpecificOutput.permissionDecision on stdout with exit 0. Allow and Observe emit an empty object. Every internal failure is stderr plus exit 2 with empty stdout. One script, one -Mode switch, both images; there is deliberately no second copy."
+    },
+    {
+      "id": "ledger",
+      "status": "known-but-split",
+      "consumes": ["receipts", "LEDGER_PRINCIPAL", "the existing chain"],
+      "emits": ["Get-LedgerVerify result", "chain head hash"],
+      "gates": "container boot, via entrypoint.ps1 exit 14",
+      "evidence": [
+        "vendor/claude.agent.substrate at 3933dccf4013f9427a2e14206899ec8eede155cd (tag v0.1.0)",
+        "modules/ledger/ledger.psd1 FunctionsToExport = Invoke-LedgerForce, Get-LedgerStatus, Get-LedgerVerify, Get-LedgerEntry",
+        "entrypoint.ps1 calls Get-LedgerVerify and exits 14 on a broken chain"
+      ],
+      "notes": "Split because verify is exported and append is not. Add-LedgerRecord exists at Ledger.psm1:298 and is absent from Export-ModuleMember at Ledger.psm1:1121, so hooks/sentinel.ps1 reaches it through module session state. No hash algorithm, receipt byte layout or record schema is asserted here: the sentinel writes through the module and does not reimplement the format. BLOCKER-1."
+    },
+    {
+      "id": "inspector",
+      "status": "proposed",
+      "consumes": ["config/patterns.json", "payload", "optional receipt"],
+      "emits": ["observations", "flags"],
+      "gates": "nothing unless specified",
+      "evidence": [],
+      "notes": "claude.build.inspector is not vendored into this repo and is referenced nowhere in the tree. The row exists so the surface is complete, not because anything here consumes it."
+    },
+    {
+      "id": "fuzzer",
+      "status": "proposed",
+      "consumes": ["config/patterns.json", "the deny list"],
+      "emits": ["cases"],
+      "gates": "nothing",
+      "evidence": [],
+      "notes": "Not vendored here. Standing constraint carried forward from the sibling law: the fuzzer must never write the receipt chain."
+    }
+  ],
+  "exceptions": [
+    {
+      "id": "hook-timeout-fails-open",
+      "statement": "A command hook that exceeds its timeout fails open. The PreToolUse timeout is 15s in both managed-settings.json files. A sentinel that hangs is a sentinel that is not consulted.",
+      "status": "accepted",
+      "evidence": "Claude Code hook semantics; managed-settings.json timeout 15"
+    },
+    {
+      "id": "identity-operator-asserted",
+      "statement": "LEDGER_PRINCIPAL is whatever docker run -e says it is. Nothing signs it and nothing can tell a true principal from a claimed one. It is not a signature; it is a place to be caught lying.",
+      "status": "blocker",
+      "blocker": "BLOCKER-2",
+      "evidence": "entrypoint.ps1 principal section; exit 12 if unset"
+    },
+    {
+      "id": "developer-image-weaker",
+      "statement": "The developer image denies nothing: permissions.deny is empty and the sentinel runs -Mode Observe. This is deliberate, because permissions.deny beats any hook decision, so an Observe image that denied would make the mode pointless. Receipts are still written on every call.",
+      "status": "accepted",
+      "evidence": "images/developer/managed-settings.json; tests/Settings.Tests.ps1:106 asserts deny count is zero, with that reason"
+    },
+    {
+      "id": "headless-allowedtools-unproven",
+      "statement": "Hook behaviour under headless -p with allowedTools set to a wildcard has not been tested here and is not asserted by any test in this repo.",
+      "status": "unproven",
+      "evidence": "no test in tests/ exercises headless mode"
+    },
+    {
+      "id": "allow-list-defeats-hook",
+      "statement": "A hook permissionDecision is ignored when the tool sits in permissions.allow (claude-code#18312). Designed around rather than fixed: permissions.allow is empty in both images and entrypoint.ps1 exits 11 if a gated tool ever appears there.",
+      "status": "accepted",
+      "evidence": "prompts/assessment.2026-09-21.json marks it an open bug; entrypoint.ps1 allow-list scan"
+    },
+    {
+      "id": "ledger-append-not-exported",
+      "statement": "The receipt-append function is not part of the Ledger module public surface, so the sentinel depends on a private name. The fix belongs in claude.build.ledger.",
+      "status": "blocker",
+      "blocker": "BLOCKER-1",
+      "evidence": "Ledger.psm1:298 defines Add-LedgerRecord; Ledger.psd1 FunctionsToExport omits it"
+    },
+    {
+      "id": "installer-not-hash-pinned",
+      "statement": "Claude Code is installed from a script fetched at build time. The version is pinned by ARG; the installer script itself is not verified by hash. It is the one unverified download left in either image.",
+      "status": "blocker",
+      "blocker": "BLOCKER-8",
+      "evidence": "Dockerfile Claude Code install step"
+    },
+    {
+      "id": "main-develop-split",
+      "statement": "main and develop have diverged into two incompatible repositories. develop carries a CI workflow whose handoff guard requires eight files that exist on no run-01 commit, and a trailer guard that every run-01 commit violates. run-01 was built on the main side of the split and cannot pass develop CI without history rewriting, which develop's own AGENTS.md forbids.",
+      "status": "blocker",
+      "blocker": "BLOCKER-5",
+      "evidence": "git rev-list --left-right --count main...develop gives 5 and 16; develop:.github/workflows/ci.yml guards; develop:AGENTS.md:54"
+    }
+  ]
+}

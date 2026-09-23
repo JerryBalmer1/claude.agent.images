@@ -1,0 +1,5 @@
+ledger/
+work/
+.git/
+*.md
+!README.md

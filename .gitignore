@@ -1,0 +1,46 @@
+# Snake run artifacts. scripts/snake.ps1 appends its report block to
+# docs/plans/<slug>-report.md on every run. That is a log of what happened, not
+# a record of what was authorised — the plan file is the record. Ignored so it
+# cannot drift into a commit and be mistaken for one.
+#
+# NOTE (merge, 2026-09-21): docs/plans/env-local-report.md and
+# docs/plans/operating-protocol-report.md are already TRACKED on this lineage, and
+# .gitignore never untracks anything, so they stay. This rule governs new ones only.
+docs/plans/*-report.md
+
+# Credentials. The ignore rule exists BEFORE the file it protects, so there is no
+# window in which a careless `git add -A` can stage a real token.
+# .env.example IS committed — it is the documentation. .env.local never is.
+#
+# Order matters here: `.env.*` would swallow .env.example, so the negation follows it.
+.env.local
+.env.*.local
+.env
+.env.*
+!.env.example
+
+# Terraform. tfvars and state both carry credentials in plain text.
+*.tfvars
+*.tfstate*
+.terraform/
+crash.log
+
+# Private keys.
+*.pem
+id_ed25519*
+
+# Build output.
+*.log
+out/
+output/
+bin/
+obj/
+
+# ...except a run order's transcript, which is EVIDENCE and is mandated by the plan that
+# produced it. The `*.log` above would swallow docs/plans/<slug>/TRANSCRIPT.log, which
+# HASHES.txt is computed over — making COMBINED unreproducible from a clone while every
+# local check still passed. Recorded as F-31 in the compliance plan.
+#
+# This is a DELIBERATE ADDITION to the union, not a line either side carried: without it
+# this pass cannot commit its own evidence. See FINDINGS.md FINDING-M7.
+!docs/plans/**/TRANSCRIPT.log

@@ -1,0 +1,21 @@
+* text=auto
+*.ps1 text eol=crlf
+*.psm1 text eol=crlf
+*.psd1 text eol=crlf
+
+# GENERATED FILES: LF EVERYWHERE, NOT NEGOTIABLE.
+#
+# scripts/Generate-Policy.ps1 renders these and CI check `generated-match-config` compares them
+# to the config BYTE FOR BYTE. The generator always emits LF - that determinism is the whole
+# reason a byte comparison counts as evidence.
+#
+# Under the `* text=auto` above these are checked out with the platform's native ending, so a
+# Windows clone gets CRLF while the generator still renders LF: the check fails on a tree nobody
+# has touched, and passes on the ubuntu runner, which is the worst way for it to be wrong. It
+# passed here only because the working copy had never been re-checked-out since being written.
+docs/POLICY.md text eol=lf
+.github/PULL_REQUEST_TEMPLATE.md text eol=lf
+
+# Consumed by git INSIDE the container as GIT_CONFIG_GLOBAL, off the bind mount, so it must not
+# arrive carrying CRLF from a Windows checkout.
+build/container.gitconfig text eol=lf

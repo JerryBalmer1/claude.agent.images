@@ -1,0 +1,27 @@
+{
+  "allowManagedHooksOnly": true,
+  "disableBypassPermissionsMode": true,
+  "permissions": {
+    "allow": [],
+    "deny": [
+      "Bash",
+      "Shell(*)",
+      "Edit(*)",
+      "Write(*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -File /opt/leash/hooks/sentinel.ps1 -Mode Enforce",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

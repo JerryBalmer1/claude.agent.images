@@ -1,0 +1,91 @@
+# One job per entry in config/repo.json -> required_checks.
+#
+# The job KEY is the check name, and no job sets `name:`. That is deliberate: when a job has no
+# display name, GitHub reports the check run under the job key, so the names the automerge
+# workflow matches on are exactly the strings in config/repo.json. Adding a `name:` here would
+# silently rename the check and automerge would wait forever for a check that never reports.
+#
+# The `generated-match-config` job asserts that the set of job keys below equals
+# config.required_checks, so this file cannot drift from the config without going red.
+#
+# No inline bash anywhere. Every step is `shell: pwsh` calling a script in scripts/.
+name: ci
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+jobs:
+  requires-header:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - shell: pwsh
+        run: ./scripts/ci/Test-RequiresHeader.ps1
+
+  trailer-guard:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - shell: pwsh
+        run: ./scripts/ci/Test-Trailers.ps1 -Base '${{ github.event.pull_request.base.sha }}'
+
+  branch-flow:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - shell: pwsh
+        run: ./scripts/ci/Test-BranchFlow.ps1 -Head '${{ github.event.pull_request.head.ref }}' -Base '${{ github.event.pull_request.base.ref }}'
+
+  generated-match-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - shell: pwsh
+        run: ./scripts/ci/Test-GeneratedMatchesConfig.ps1
+
+  pester:
+    runs-on: ubuntu-latest
+    steps:
+      # NO `submodules: recursive`, and that is not an oversight - it is blocked on a human.
+      #
+      # This repository vendors the Ledger module as a git submodule at vendor/claude.build.ledger,
+      # and claude.build.ledger is PRIVATE. The GITHUB_TOKEN that actions/checkout uses is scoped
+      # to this repository alone, so the clone fails outright:
+      #
+      #   fatal: repository 'https://github.com/JerryBalmer1/claude.build.ledger.git/' not found
+      #   fatal: clone of '...' into submodule path 'vendor/claude.build.ledger' failed
+      #
+      # Fetching it needs a PAT with read access to that repo, stored as a repository secret and
+      # passed here as `token:`. Creating that secret is Jerry's to do, not an agent's.
+      #
+      # Until then scripts/ci/Invoke-Tests.ps1 detects the absent manifest and excludes the
+      # `Ledger` tag, printing which tests it skipped and why. It degrades VISIBLY: the run says
+      # what it did not check. See docs/plans/2026-09-21-cleanup/FINDINGS.md FINDING-M17.
+      #
+      # fetch-depth: 0 so the suite can walk history; the trailer tests need a real graph, and a
+      # shallow clone makes base..HEAD empty, which passes vacuously.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - shell: pwsh
+        run: ./scripts/ci/Invoke-Tests.ps1
+
+  forensic-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - shell: pwsh
+        run: ./scripts/forensic.ps1 -Verify

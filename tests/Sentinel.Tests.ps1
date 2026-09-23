@@ -1,0 +1,208 @@
+#Requires -Version 7.4
+
+<#
+    The sentinel is the only thing standing between the agent and the tools, so
+    these tests assert its three observable outputs exactly: what is on stdout,
+    what is on stderr, and the exit code. "It denied" is not a claim worth
+    testing; "stdout parsed to an object with exactly one property named
+    hookSpecificOutput whose permissionDecision was deny, and the process
+    exited 0" is.
+
+    Exit codes are the part most easily got backwards, so they are asserted on
+    every single case: a deny is exit 0 with a body, and exit 2 is reserved for
+    the sentinel's own failures. Swap those two and the hook still looks like
+    it works while the reason never reaches anyone.
+#>
+
+BeforeAll {
+    Import-Module (Join-Path $PSScriptRoot 'TestHelpers.psm1') -Force
+
+    $script:RepoRoot = Get-RepoRoot
+    $script:Sentinel = Join-Path $script:RepoRoot 'hooks' 'sentinel.ps1'
+    $script:LedgerModule = Get-LedgerManifestPath
+    $script:GatedTools = @('Bash', 'Shell', 'Edit', 'Write')
+
+    function script:New-Payload {
+        param([string]$Tool)
+        return (@{
+            session_id      = 'run-01-test'
+            hook_event_name = 'PreToolUse'
+            tool_name       = $Tool
+            tool_input      = @{ command = 'id -u' }
+        } | ConvertTo-Json -Compress -Depth 5)
+    }
+
+    function script:Invoke-Sentinel {
+        param(
+            [AllowEmptyString()][AllowNull()][string]$Stdin,
+            [string]$Mode = 'Enforce',
+            [string]$LedgerPath,
+            [string]$Principal = 'run-01-test'
+        )
+        return Invoke-LeashScript -Path $script:Sentinel -Arguments @('-Mode', $Mode) -Stdin $Stdin -Environment @{
+            LEASH_LEDGER_PATH   = $LedgerPath
+            LEASH_LEDGER_MODULE = $script:LedgerModule
+            LEDGER_PRINCIPAL    = $Principal
+            LEASH_MODE          = $Mode
+        }
+    }
+}
+
+Describe 'Sentinel: the vendored Ledger it depends on' -Tag 'Ledger' {
+    It 'has a manifest to import' {
+        $script:LedgerModule | Should -Exist
+    }
+
+    It 'still provides Add-LedgerRecord in module scope (BLOCKER-1 tripwire)' {
+        # Add-LedgerRecord is NOT exported, so the sentinel reaches it through
+        # the module's session state. That is a coupling to a private name. If
+        # claude.build.ledger renames it or exports it properly, this test is
+        # the thing that says so, instead of every hook call failing closed in
+        # production with "ledger write failed".
+        $module = Import-Module -Name $script:LedgerModule -PassThru -Force
+        $found = & $module { Get-Command -Name 'Add-LedgerRecord' -ErrorAction SilentlyContinue }
+        $found | Should -Not -BeNullOrEmpty -Because 'the sentinel appends receipts through this private function'
+    }
+}
+
+Describe 'Sentinel: Enforce mode' -Tag 'Ledger' {
+    BeforeEach {
+        $script:Box = New-LeashSandbox
+    }
+    AfterEach {
+        Remove-LeashSandbox -Root $script:Box.Root
+    }
+
+    It 'denies <_> with exit 0 and a well-formed decision body' -ForEach @('Bash', 'Shell', 'Edit', 'Write') {
+        $tool = $_
+        $r = Invoke-Sentinel -Stdin (New-Payload -Tool $tool) -LedgerPath $script:Box.LedgerPath
+
+        # exit 0, because stdout JSON is honored ONLY on exit 0.
+        $r.ExitCode | Should -Be 0 -Because 'a deny is carried by the body, not by the exit code'
+
+        $body = ConvertFrom-JsonSafe -Text $r.StdOut
+        @($body.PSObject.Properties.Name) | Should -Be @('hookSpecificOutput') -Because 'nothing else may be on stdout'
+        $body.hookSpecificOutput.hookEventName | Should -BeExactly 'PreToolUse'
+        $body.hookSpecificOutput.permissionDecision | Should -BeExactly 'deny'
+        $body.hookSpecificOutput.permissionDecisionReason | Should -Not -BeNullOrEmpty
+        $body.hookSpecificOutput.permissionDecisionReason | Should -BeLike "*$tool*"
+
+        # The stale contract must not come back.
+        $body.PSObject.Properties.Name | Should -Not -Contain 'decision'
+    }
+
+    It 'allows a non-gated tool (Read) with exactly {} and exit 0' {
+        $r = Invoke-Sentinel -Stdin (New-Payload -Tool 'Read') -LedgerPath $script:Box.LedgerPath
+
+        $r.ExitCode | Should -Be 0
+        $r.StdOut | Should -BeExactly '{}'
+        $body = ConvertFrom-JsonSafe -Text $r.StdOut
+        # Count the properties, not the names: .Name on an empty property
+        # collection yields $null, and @($null) has a Count of 1.
+        @($body.PSObject.Properties).Count | Should -Be 0 -Because 'no opinion means no properties'
+    }
+
+    It 'writes exactly one receipt per decision, for allow and deny alike' {
+        foreach ($tool in @('Bash', 'Read', 'Write')) {
+            $r = Invoke-Sentinel -Stdin (New-Payload -Tool $tool) -LedgerPath $script:Box.LedgerPath
+            $r.ExitCode | Should -Be 0
+        }
+        $script:Box.LedgerPath | Should -Exist
+        @(Get-Content -LiteralPath $script:Box.LedgerPath).Count | Should -Be 3
+    }
+
+    It 'produces a chain that Get-LedgerVerify accepts' {
+        foreach ($tool in @('Bash', 'Read', 'Edit')) {
+            $null = Invoke-Sentinel -Stdin (New-Payload -Tool $tool) -LedgerPath $script:Box.LedgerPath
+        }
+        Import-Module -Name $script:LedgerModule -Force
+        $verify = Get-LedgerVerify -LedgerPath $script:Box.LedgerPath
+        $verify.Ok | Should -BeTrue
+        $verify.Count | Should -Be 3
+        $verify.LastSelf | Should -Match '^[0-9a-f]{64}$'
+    }
+
+    It 'records the decision and hashes the payload it actually saw' {
+        $payload = New-Payload -Tool 'Bash'
+        $null = Invoke-Sentinel -Stdin $payload -LedgerPath $script:Box.LedgerPath
+
+        $record = (Get-Content -LiteralPath $script:Box.LedgerPath -Raw).Trim() | ConvertFrom-Json
+        $record.validator | Should -BeExactly 'sentinel'
+        $record.mode | Should -BeExactly 'Enforce'
+        $record.model | Should -BeExactly 'run-01-test/Bash/deny'
+
+        $expected = [System.Convert]::ToHexString(
+            [System.Security.Cryptography.SHA256]::HashData(
+                [System.Text.Encoding]::UTF8.GetBytes($payload))).ToLowerInvariant()
+        $record.sha256 | Should -BeExactly $expected -Because 'the receipt must prove what the sentinel saw'
+    }
+}
+
+Describe 'Sentinel: Observe mode' -Tag 'Ledger' {
+    BeforeEach { $script:Box = New-LeashSandbox }
+    AfterEach { Remove-LeashSandbox -Root $script:Box.Root }
+
+    It 'returns exactly {} for a gated tool and still writes the receipt' {
+        $r = Invoke-Sentinel -Stdin (New-Payload -Tool 'Bash') -Mode 'Observe' -LedgerPath $script:Box.LedgerPath
+
+        $r.ExitCode | Should -Be 0
+        $r.StdOut | Should -BeExactly '{}'
+
+        $script:Box.LedgerPath | Should -Exist
+        $record = (Get-Content -LiteralPath $script:Box.LedgerPath -Raw).Trim() | ConvertFrom-Json
+        $record.mode | Should -BeExactly 'Observe'
+        $record.model | Should -BeExactly 'run-01-test/Bash/observe'
+    }
+
+    It 'never denies, for any gated tool' -ForEach @('Bash', 'Shell', 'Edit', 'Write') {
+        $r = Invoke-Sentinel -Stdin (New-Payload -Tool $_) -Mode 'Observe' -LedgerPath $script:Box.LedgerPath
+        $r.ExitCode | Should -Be 0
+        $r.StdOut | Should -BeExactly '{}'
+    }
+}
+
+Describe 'Sentinel: fails closed' -Tag 'Ledger' {
+    BeforeEach { $script:Box = New-LeashSandbox }
+    AfterEach { Remove-LeashSandbox -Root $script:Box.Root }
+
+    It 'exits 2 with empty stdout on <Name>' -ForEach @(
+        @{ Name = 'malformed stdin'; Stdin = 'not json at all {{{' }
+        @{ Name = 'empty stdin'; Stdin = '' }
+        @{ Name = 'valid JSON with no tool_name'; Stdin = '{"session_id":"x"}' }
+        @{ Name = 'a JSON array instead of an object'; Stdin = '[{"tool_name":"Bash"}]' }
+        @{ Name = 'a bare JSON string'; Stdin = '"Bash"' }
+    ) {
+        $r = Invoke-Sentinel -Stdin $Stdin -LedgerPath $script:Box.LedgerPath
+
+        $r.ExitCode | Should -Be 2 -Because 'exit 2 blocks the call and feeds stderr back to Claude'
+        $r.StdOut | Should -BeExactly '' -Because 'a body on a failure path would be discarded anyway, and hides the error'
+        $r.StdErr | Should -Match 'leash-sentinel:'
+    }
+
+    It 'exits 2 when the ledger directory is not mounted' {
+        $r = Invoke-Sentinel -Stdin (New-Payload -Tool 'Read') `
+            -LedgerPath (Join-Path $script:Box.Root 'no-such-mount' 'ledger.jsonl')
+
+        $r.ExitCode | Should -Be 2
+        $r.StdOut | Should -BeExactly ''
+        $r.StdErr | Should -Match 'ledger directory is not mounted'
+    }
+
+    It 'exits 2 when the Ledger module is missing, rather than allowing unlogged' {
+        $r = Invoke-LeashScript -Path $script:Sentinel -Arguments @('-Mode', 'Enforce') `
+            -Stdin (New-Payload -Tool 'Read') -Environment @{
+                LEASH_LEDGER_PATH   = $script:Box.LedgerPath
+                LEASH_LEDGER_MODULE = (Join-Path $script:Box.Root 'no-such-module.psd1')
+                LEDGER_PRINCIPAL    = 'run-01-test'
+            }
+
+        $r.ExitCode | Should -Be 2
+        $r.StdOut | Should -BeExactly ''
+        $r.StdErr | Should -Match 'ledger write failed'
+    }
+
+    It 'writes no receipt when it fails closed' {
+        $null = Invoke-Sentinel -Stdin 'not json' -LedgerPath $script:Box.LedgerPath
+        $script:Box.LedgerPath | Should -Not -Exist -Because 'a payload it could not parse is not a decision it made'
+    }
+}
