@@ -166,5 +166,83 @@ function Test-AssessmentHash {
     return $actual
 }
 
+function Get-SkipJustification {
+    <#
+    .SYNOPSIS
+        The stated reason a skipped test is allowed to be skipped, or $null for none.
+
+    .DESCRIPTION
+        Two forms, and both are read off the TEST OBJECT — its own tags, plus every
+        parent block's — never out of a comment sitting beside the test. A comment is
+        not a measurement: nothing reads it, so nothing goes red when it stops being
+        true, which is the honour system this gate exists to replace.
+
+            BLOCKER-n                 a skip waiting on a numbered blocker.
+            SkipWhen:<kebab-reason>   a precondition that is legitimately unmet today.
+
+        The second form exists because BLOCKER-n is the wrong token for the trailer
+        falsification tests. Blockers are being retired, and "no exempt commit in range"
+        is not a blocker — it is a state this repository is simply in on most days, and
+        will drop back into whenever a grandfathered commit enters the range again. A
+        blocker gets fixed and struck; this does not.
+
+        It returns the REASON rather than a boolean so a gate can report WHY a test did
+        not run, not merely that it did not. For BLOCKER-n the reason is the token
+        itself; for SkipWhen it is the text after the colon, pulled from the pattern's
+        own named group so the pattern and the extraction cannot drift apart.
+
+        THE HOME FOR THIS IS DELIBERATE. build/tasks/Test.build.ps1 (host) and
+        build/InContainer.Test.ps1 (container) are two independent implementations of
+        the same gate, and they already differ on NotRun. Writing this rule a third and
+        fourth time would guarantee they eventually disagree about what a justification
+        even is. The container reaches this module at /work/build, which is bind-mounted;
+        nothing here depends on Invoke-Build.
+
+    .EXAMPLE
+        Get-SkipJustification -Tag @('SkipWhen:no-exempt-commit-in-range')
+        no-exempt-commit-in-range
+    #>
+    [CmdletBinding()]
+    [OutputType([string])]
+    param(
+        [Parameter(Position = 0)]
+        [AllowNull()]
+        [AllowEmptyCollection()]
+        [string[]]$Tag,
+
+        [Parameter()]
+        [ValidateNotNullOrEmpty()]
+        [string]$BlockerPattern = '^BLOCKER-\d+$',
+
+        # The 'reason' group is load-bearing: it is the string the gates print. A
+        # replacement pattern that omits it falls back to the whole tag rather than
+        # reporting an empty reason, which would read as a justification that justifies
+        # nothing.
+        [Parameter()]
+        [ValidateNotNullOrEmpty()]
+        [string]$SkipWhenPattern = '^SkipWhen:(?<reason>[a-z0-9]+(-[a-z0-9]+)*)$'
+    )
+
+    $tags = @($Tag | Where-Object { $_ })
+
+    # Blockers first: if a test carries both, the blocker is the more serious claim and
+    # is the one worth surfacing.
+    foreach ($t in $tags) {
+        if ($t -cmatch $BlockerPattern) { return $t }
+    }
+
+    foreach ($t in $tags) {
+        $m = [regex]::Match($t, $SkipWhenPattern)
+        if ($m.Success) {
+            $reason = $m.Groups['reason'].Value
+            if ($reason) { return $reason }
+            return $t
+        }
+    }
+
+    return $null
+}
+
 Export-ModuleMember -Function 'ConvertTo-CanonicalObject', 'ConvertTo-CanonicalJson',
-    'Get-StringSha256', 'Get-CanonicalJsonSha256', 'Test-AssessmentHash'
+    'Get-StringSha256', 'Get-CanonicalJsonSha256', 'Test-AssessmentHash',
+    'Get-SkipJustification'
