@@ -53,15 +53,42 @@ Describe 'Sentinel: the vendored Ledger it depends on' -Tag 'Ledger' {
         $script:LedgerModule | Should -Exist
     }
 
-    It 'still provides Add-LedgerRecord in module scope (BLOCKER-1 tripwire)' {
-        # Add-LedgerRecord is NOT exported, so the sentinel reaches it through
-        # the module's session state. That is a coupling to a private name. If
-        # claude.build.ledger renames it or exports it properly, this test is
-        # the thing that says so, instead of every hook call failing closed in
-        # production with "ledger write failed".
+    It 'EXPORTS Add-LedgerRecord, which is what the sentinel calls' {
+        # Until 2026-09-23 this test asserted the opposite arrangement: that the
+        # name was resolvable inside the module's session state, because the
+        # manifest did not export it and the sentinel reached it that way. At the
+        # vendored pin it is exported, the sentinel calls it plainly, and this
+        # test is rewritten to assert the surface it actually depends on.
+        #
+        # ExportedCommands, not `& $module { Get-Command ... }`. The session-state
+        # form passes whether or not the name is exported, so as an assertion
+        # about the PUBLIC surface it has no falsifier: withdrawing the export
+        # would leave it green while every hook call failed closed in production
+        # with "ledger write failed".
         $module = Import-Module -Name $script:LedgerModule -PassThru -Force
-        $found = & $module { Get-Command -Name 'Add-LedgerRecord' -ErrorAction SilentlyContinue }
-        $found | Should -Not -BeNullOrEmpty -Because 'the sentinel appends receipts through this private function'
+        $module.ExportedCommands.Keys | Should -Contain 'Add-LedgerRecord' -Because 'the sentinel appends receipts through this export'
+    }
+
+    It 'writes a sentinel receipt through that export, at this pin' {
+        # The other half, end to end: the export existing is not the same claim
+        # as the hook successfully using it. This runs the real sentinel against
+        # the real vendored module and hands the line it left back to the
+        # module's own verifier. Nothing here reimplements the record format, so
+        # a line Get-LedgerVerify accepts is a line the module wrote.
+        $box = New-LeashSandbox
+        try {
+            $r = Invoke-Sentinel -Stdin (New-Payload -Tool 'Bash') -LedgerPath $box.LedgerPath
+            $r.ExitCode | Should -Be 0 -Because $r.StdErr
+
+            Import-Module -Name $script:LedgerModule -Force
+            $verify = Get-LedgerVerify -LedgerPath $box.LedgerPath
+            $verify.Ok | Should -BeTrue
+            $verify.Count | Should -Be 1
+
+            $record = (Get-Content -LiteralPath $box.LedgerPath -Raw).Trim() | ConvertFrom-Json
+            $record.validator | Should -BeExactly 'sentinel'
+        }
+        finally { Remove-LeashSandbox -Root $box.Root }
     }
 }
 

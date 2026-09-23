@@ -30,13 +30,18 @@ the unrolled-array case.
 
 ### ledger-wired-or-honest-unwired
 **State:** wired, honestly, with one named gap. Not UNWIRED.
-**Blocker:** **BLOCKER-1** — `Add-LedgerRecord` is defined at `Ledger.psm1:298` but absent from
-`Export-ModuleMember` at `Ledger.psm1:1121`, so `hooks/sentinel.ps1` reaches it through module
-session state. `Get-LedgerVerify` *is* exported and the entrypoint's chain check is live.
-**Next shot:** the fix is in `claude.build.ledger`, not here — add the append function to
-`FunctionsToExport` in `Ledger.psd1`, bump the submodule pin, then delete the session-state call in
-the sentinel. Until then the tripwire in `tests/Sentinel.Tests.ps1` keeps the breakage loud instead
-of surfacing as "ledger write failed" on every hook call in production.
+**Blocker (the first-numbered one of this run — RETIRED 2026-09-23):** `Add-LedgerRecord` was
+defined at `Ledger.psm1:298` but absent from `Export-ModuleMember` at `Ledger.psm1:1121`, so
+`hooks/sentinel.ps1` reached it through module session state. `Get-LedgerVerify` *was* exported
+and the entrypoint's chain check was live.
+**Next shot, and it was taken exactly as written:** the fix was in `claude.build.ledger`, not here
+— add the append function to `FunctionsToExport` in `Ledger.psd1`, bump the submodule pin, then
+delete the session-state call in the sentinel. All three landed: vendor pin `a68664e` exports the
+name from `ledger.psd1:9` and `ledger.psm1:1121-1122`, and on 2026-09-23 the sentinel's
+session-state call was replaced by the plain exported call. The tripwire in
+`tests/Sentinel.Tests.ps1` was rewritten to assert the export rather than deleted, so a withdrawn
+export is still loud instead of surfacing as "ledger write failed" on every hook call in
+production. Forensic chain seq 9, `blocker-1-retired`.
 
 ### config-surface-landed
 **State:** started. `config/contracts.json` and `schemas/contracts.schema.json` exist and validate.
@@ -44,8 +49,10 @@ Nothing consumes them yet, which is what §5 permitted.
 **Blocker:** none for what landed.
 **Next shot:** `core.json`, `policy.json`, `patterns.json`, then rewire consumers one at a time —
 `policy.json` first, because it has three consumers and nine duplicate literals to collapse
-(§1.11). `ledger.json` stays unwritten until BLOCKER-1 clears; there is no point pinning a contract
-to a function the module will not admit it has.
+(§1.11). `ledger.json` stays unwritten until the receipt-append export lands; there is no point
+pinning a contract to a function the module will not admit it has. (It landed: vendor pin
+`a68664e`, retired 2026-09-23. `ledger.json` is still unwritten, now for no reason but that nobody
+has written it.)
 
 ### pester-in-container
 **State:** done at `06e738d` — `passed=109 failed=0 skipped=0`, in-container, pwsh 7.6.6,
@@ -94,7 +101,7 @@ Dockerfile ARGs are passed from it at build time by `Images.build.ps1`; the seco
 
 | # | Blocker | New this run |
 |---|---|---|
-| BLOCKER-1 | Ledger does not export a receipt-append function; the sentinel couples to a private name | no |
+| 1 — ~~open~~ RETIRED 2026-09-23 | Ledger did not export a receipt-append function; the sentinel coupled to a private name. Cleared at vendor pin `a68664e`; the sentinel now calls the export plainly | no |
 | BLOCKER-2 | No signing key. Identity is operator-asserted | no |
 | BLOCKER-3 | Command-hook timeout fails open — Claude Code semantics, 15s | no |
 | BLOCKER-4 | `LEDGER_PRINCIPAL` is unverifiable; it is a place to be caught lying | no |

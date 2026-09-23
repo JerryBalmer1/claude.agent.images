@@ -160,17 +160,21 @@ try {
         Exit-Closed "ledger directory is not mounted: $ledgerDir"
     }
 
-    $module = Import-Module -Name $LedgerModule -PassThru -Force -ErrorAction Stop
+    Import-Module -Name $LedgerModule -Force -ErrorAction Stop
 
-    # Add-LedgerRecord exists (Ledger.psm1) but the manifest does not export it,
-    # so it is reached through the module's own session state. See BLOCKER-1 in
-    # END_GOAL.md: the right fix is for claude.build.ledger to export an
-    # append-a-receipt function, and until it does, this coupling is to a
-    # private name. tests/Sentinel.Tests.ps1 covers it so the breakage is loud.
-    $receipt = & $module {
-        param($P, $A, $V, $M, $Mo, $S)
-        Add-LedgerRecord -Path $P -Attempt $A -Validator $V -Mode $M -Model $Mo -Sha256 $S
-    } $LedgerPath 1 'sentinel' $Mode "$principal/$tool/$decision" $payloadSha
+    # Add-LedgerRecord is part of the module's public surface at the vendored
+    # pin: FunctionsToExport in ledger.psd1:9 and Export-ModuleMember at
+    # ledger.psm1:1121-1122. It is therefore called plainly.
+    #
+    # Until 2026-09-23 these five lines were a scriptblock invoked with
+    # `& $module { ... }`, reaching the function through the module's own
+    # session state because the manifest did not export it. That workaround is
+    # gone rather than left in place: it would keep working unchanged if the
+    # export were ever withdrawn, which is exactly the failure worth being told
+    # about. Called as an export, a withdrawal is loud here and in
+    # tests/Sentinel.Tests.ps1 instead of silently passing through a private name.
+    $receipt = Add-LedgerRecord -Path $LedgerPath -Attempt 1 -Validator 'sentinel' `
+        -Mode $Mode -Model "$principal/$tool/$decision" -Sha256 $payloadSha
 
     Write-Verbose "[sentinel] receipt line $($receipt.Line) self=$($receipt.Self)"
 }

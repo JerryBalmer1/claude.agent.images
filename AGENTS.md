@@ -154,8 +154,16 @@ Verify with `pwsh -NoProfile -File scripts/forensic.ps1 -Verify`, and print the
 off-tree anchor with `-Anchor`.
 
 **The blockers get listed every single run until someone decides otherwise:**
-no signing key (identity is operator-asserted), command-hook timeout fails
-open, and the Ledger's receipt-append function is not exported.
+no signing key (identity is operator-asserted), and command-hook timeout fails
+open.
+
+A third stood here until 2026-09-23 — the Ledger's receipt-append function was
+not exported, so the sentinel reached it through module session state. Someone
+decided otherwise, which is the exit this rule already provides for. At vendor
+pin `a68664e` the function is exported (`ledger.psd1:9`,
+`ledger.psm1:1121-1122`) and `hooks/sentinel.ps1` calls it plainly. It is struck
+from the standing list rather than relisted; the retirement is on the forensic
+chain at seq 9, `blocker-1-retired`.
 
 ### Breadcrumbs for the other two (Claude + Fable)
 - This build surface is NEW. Claude (Opus 5) and Fable (5.1) should pick up the plan contract, the fail-first discipline, and the snake integration from here.
