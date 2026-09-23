@@ -248,8 +248,9 @@ else {
 Write-Section 'active plan'
 $active = Join-Path $root 'docs/plans/ACTIVE.md'
 if (-not (Test-Path -LiteralPath $active)) {
-    Write-Host 'docs/plans/ACTIVE.md: ABSENT'
-    Write-Host '              no plan = no commit. Write one, or run snake.ps1 -NextPlan.'
+    Write-Host 'docs/plans/ACTIVE.md: ABSENT - no active plan, a legal state'
+    Write-Host '              AGENTS.md disagreement row 2: the STOP fires only when the'
+    Write-Host '              file EXISTS and names another branch. snake.ps1 -NextPlan drafts one.'
 }
 else {
     $planBranch = (Select-String -Path $active -Pattern '^Branch:\s*(.+)$' | Select-Object -First 1)
