@@ -19,6 +19,39 @@
     passes off that synthetic commit rather than off the thing it meant to catch.
 #>
 
+# DISCOVERY TIME, deliberately. -Skip is evaluated while Pester builds the tree, before any
+# BeforeAll has run, so this cannot use $script:RepoRoot or the helper module and re-derives
+# what it needs from $PSScriptRoot.
+#
+# WHAT THE TWO FALSIFICATION TESTS ACTUALLY NEED, measured rather than assumed. They remove the
+# exemption list and require the guard to go red. That only proves something when the list is
+# rescuing at least one commit IN THE RANGE. An empty range is the obvious case, but not the only
+# one and not the one this repository is in: at 28134a4 the range held four commits, every one
+# carrying who: claude, and the guard passed with an empty list because there was nothing for the
+# list to have been hiding. The precondition is therefore the intersection, not the range size -
+# the empty range falls out of it for free.
+#
+# Skipped, not passed. A test that cannot fail must not report green.
+$discoveryRoot        = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+$discoveryGrandfather = Join-Path $discoveryRoot '.continuity/trailer-grandfather.txt'
+
+$discoveryExempt = @()
+if (Test-Path -LiteralPath $discoveryGrandfather) {
+    $discoveryExempt = @(Get-Content -LiteralPath $discoveryGrandfather |
+                         ForEach-Object { ($_ -split '#')[0].Trim() } |
+                         Where-Object { $_ -ne '' })
+}
+
+$discoveryRange = @()
+try {
+    $discoveryRange = @(& git -C $discoveryRoot log --format=%H --no-merges 'origin/develop..HEAD' 2>$null)
+}
+catch { $discoveryRange = @() }
+
+# -ccontains: case-sensitive, full 40-char match, the same rule the guard itself applies.
+$discoveryExemptInRange = @($discoveryExempt | Where-Object { $discoveryRange -ccontains $_ })
+$NothingToFalsify       = ($discoveryExemptInRange.Count -eq 0)
+
 BeforeAll {
     Import-Module (Join-Path $PSScriptRoot 'TestHelpers.psm1') -Force
     $script:RepoRoot    = Get-RepoRoot
@@ -78,7 +111,7 @@ Describe 'the trailer guard over the pull-request range' {
         $r.ExitCode | Should -Be 0
     }
 
-    It 'rejects a Co-Authored-By trailer, which the CI port would otherwise have dropped' {
+    It 'rejects a Co-Authored-By trailer, which the CI port would otherwise have dropped' -Skip:$NothingToFalsify {
         # develop's ci.yml had a dedicated "no Co-Authored-By" step. Porting substrate's CI
         # wholesale would have lost it silently, so it is folded into the trailer guard. This
         # proves it can actually fail: an empty exemption list means the eight run-01 commits
@@ -93,7 +126,7 @@ Describe 'the trailer guard over the pull-request range' {
         finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
     }
 
-    It 'fails with an empty exemption list, so the list is load-bearing rather than decorative' {
+    It 'fails with an empty exemption list, so the list is load-bearing rather than decorative' -Skip:$NothingToFalsify {
         # THE FALSIFICATION. A guard that exempted everything would pass the test above forever.
         $tmp = Join-Path ([System.IO.Path]::GetTempPath()) "gf-empty-$([guid]::NewGuid()).txt"
         Set-Content -LiteralPath $tmp -Value '' -Encoding utf8
