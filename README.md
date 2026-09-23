@@ -59,6 +59,21 @@ Every plan that enters the system has a structured format:
 
 See `schemas/plan.schema.json` and `plans/README.md`.
 
+## Definition of done
+
+Promotion to `main` is measured, not asserted. Three clauses, all re-measured at the head
+being promoted rather than quoted from the packet that asked for it:
+
+- **(a)** `Invoke-Build Build.Image` exits 0, and both image ids are named.
+- **(b)** `Invoke-Build Test.InContainer` exits 0.
+- **(c)** Whatever the promotion claims was removed is measured absent from the tree, not
+  reported absent in prose.
+
+**Clause (b) is the exit code of the task, not the suite tally inside it.** A green suite
+inside a red `Test.InContainer` is not done: at `3e47c9e` the container reported
+`passed=150 failed=0 skipped=2` and the task still exited 1, because two skips carried no
+justification the gate could read.
+
 ## The snake
 
 The Ledger snake lives in `claude.build.ledger` (sibling repo). The builder must consume it — not reimplement it. The developer image should suck it in so plan enforcement is real.
