@@ -250,16 +250,26 @@ wrote it and it is history now - at vendor pin `a68664e` the name IS in `Functio
 written; this note is where the correction lives, because editing an attributed section to
 agree with a later fact is how a record stops being one.
 
-One objection that travelled with that claim is NOT settled, and is not quietly dropped
-here. The earlier text cited "the compliance plan's D7" for it: exporting the function raw
-means a receipt can be appended with no validated output behind it, so the decision was
-`Add-LedgerReceipt`, a constrained wrapper, rather than the raw function. **That plan file
-is not in this tree** - `docs/plans/` was pruned to code-named files at birth (forensic
-seq 1), and `git grep` finds no D7 here - so the citation is carried, not verifiable from
-this repository. What IS measurable: `Add-LedgerReceipt` exists in neither this tree nor
-`vendor/claude.agent.core` at `a68664e`; upstream exported the raw `Add-LedgerRecord`. The
-objection therefore stands unmet. What changed is only that the sentinel depends on a
-public name instead of a private one, which is a smaller claim than the wrapper asked for.
+One objection that travelled with that claim is NOT settled upstream, and is not quietly
+dropped here. The earlier text cited "the compliance plan's D7" for it: exporting the
+function raw means a receipt can be appended with no validated output behind it, so the
+decision was `Add-LedgerReceipt`, a constrained wrapper, rather than the raw function.
+**That plan file is not in this tree** - `docs/plans/` was pruned to code-named files at
+birth (forensic seq 1), and `git grep` finds no D7 here - so the citation is carried, not
+verifiable from this repository. What IS measurable, re-measured 2026-09-23 at vendor pin
+`a68664e6b9938773478d967348b590f487fe2443`: `Add-LedgerReceipt` exists in neither this tree
+nor `vendor/claude.agent.core` - `git grep` returns nothing in core, and here it returns
+only the two prose lines in this note - while core exports the raw `Add-LedgerRecord` as one
+of five names at `modules/ledger/ledger.psd1:9`.
+
+**Where it stands, decided 2026-09-23: OPEN IN CORE, CLOSED IN IMAGES.** A wrapper over a
+Ledger export is Ledger API, and this repository consumes core rather than adding to it -
+there is no place here to put an `Add-LedgerReceipt` that would not immediately belong to
+core. So the objection stops being carried as an unmet obligation of THIS tree, which is how
+the line above used to read, and is carried instead as an open objection against core at the
+pin named. No wrapper is written here and core is not touched. What this repository did change
+is smaller and is not offered as meeting the objection: the sentinel depends on a public name
+instead of a private one. Forensic chain seq 12, `tidy-before-promotion-six-items`.
 
 ## 2026-09-21 — Grok review of oneshot (this file created on origin)
 
