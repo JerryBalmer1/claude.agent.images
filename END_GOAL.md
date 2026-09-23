@@ -82,14 +82,17 @@ Test.InContainer` → `Build succeeded. 5 tasks, 0 errors, 0 warnings`.
 
 **Blockers:**
 
-- **BLOCKER-1 — the Ledger does not export a receipt-append function.**
-  `Get-LedgerVerify` *is* exported, so the entrypoint's chain check is live and
-  needs no `-WhatIf` guard. `Add-LedgerRecord` exists at `Ledger.psm1:298` but
-  is absent from `Export-ModuleMember` at `Ledger.psm1:1121`, so the sentinel
-  reaches it through the module's own session state. That is a coupling to a
-  private name. The fix belongs in `claude.build.ledger`;
-  `tests/Sentinel.Tests.ps1` carries a tripwire so the breakage is loud rather
-  than appearing in production as "ledger write failed" on every hook call.
+- **The receipt-append export — RETIRED 2026-09-23, and listed here as history.**
+  At the time of this run the Ledger exported no receipt-append function:
+  `Add-LedgerRecord` existed at `Ledger.psm1:298` but was absent from
+  `Export-ModuleMember` at `Ledger.psm1:1121`, so the sentinel reached it
+  through the module's own session state — a coupling to a private name.
+  `Get-LedgerVerify` *was* exported even then, so the entrypoint's chain check
+  was live and needed no `-WhatIf` guard. The fix landed upstream: at vendor pin
+  `a68664e` the name is exported by both `ledger.psd1:9` and
+  `ledger.psm1:1121-1122`, `hooks/sentinel.ps1` calls it plainly, and
+  `tests/Sentinel.Tests.ps1` asserts the export rather than the workaround.
+  Retirement recorded on the forensic chain at seq 9, `blocker-1-retired`.
 - **No signing key.** Not touched, per the run order. Nothing signs anything.
 - **Command-hook timeout fails open.** Not touched, per the run order. The 15s
   PreToolUse timeout is Claude Code semantics; a sentinel that hangs is a
@@ -144,11 +147,23 @@ for the run. The second was created on `origin` by Grok and never merged.
 The content below is Grok's, moved VERBATIM and not edited. `docs/END_GOAL.md` is deleted
 in the same commit. Nothing is lost; it changes address and says whose it is.
 
-Note a claim in it that this pass has since settled: "`Add-LedgerRecord` not in
-`FunctionsToExport`. Fix in `claude.build.ledger`, then pin bump." That is BLOCKER-1, and
-the compliance plan's D7 records the objection to exporting it raw - a receipt could then
-be appended with no validated output behind it. The decision is `Add-LedgerReceipt`, a
-constrained wrapper, not the raw function.
+Note a claim in it that later passes settled: "`Add-LedgerRecord` not in
+`FunctionsToExport`. Fix in `claude.build.ledger`, then pin bump." It was true when Grok
+wrote it and it is history now - at vendor pin `a68664e` the name IS in `FunctionsToExport`
+(`ledger.psd1:9`) and the pin bump has landed. Grok's words above are left exactly as
+written; this note is where the correction lives, because editing an attributed section to
+agree with a later fact is how a record stops being one.
+
+One objection that travelled with that claim is NOT settled, and is not quietly dropped
+here. The earlier text cited "the compliance plan's D7" for it: exporting the function raw
+means a receipt can be appended with no validated output behind it, so the decision was
+`Add-LedgerReceipt`, a constrained wrapper, rather than the raw function. **That plan file
+is not in this tree** - `docs/plans/` was pruned to code-named files at birth (forensic
+seq 1), and `git grep` finds no D7 here - so the citation is carried, not verifiable from
+this repository. What IS measurable: `Add-LedgerReceipt` exists in neither this tree nor
+`vendor/claude.agent.core` at `a68664e`; upstream exported the raw `Add-LedgerRecord`. The
+objection therefore stands unmet. What changed is only that the sentinel depends on a
+public name instead of a private one, which is a smaller claim than the wrapper asked for.
 
 ## 2026-09-21 — Grok review of oneshot (this file created on origin)
 

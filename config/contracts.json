@@ -36,7 +36,7 @@
         "modules/ledger/ledger.psd1 FunctionsToExport = Invoke-LedgerForce, Get-LedgerStatus, Get-LedgerVerify, Get-LedgerEntry, Add-LedgerRecord",
         "entrypoint.ps1 calls Get-LedgerVerify and exits 14 on a broken chain"
       ],
-      "notes": "No longer split: at the pinned sha both verify and append are exported. Add-LedgerRecord is defined at ledger.psm1:298, named in FunctionsToExport at ledger.psd1:9 and in Export-ModuleMember at ledger.psm1:1121-1122, and Get-Command -Module ledger lists it. BLOCKER-1 is cleared upstream; the exception row below and its nine other references are retired separately, not here. hooks/sentinel.ps1 still reaches the function through module session state, which is now backed by the public surface rather than working around its absence. No hash algorithm, receipt byte layout or record schema is asserted here: the sentinel writes through the module and does not reimplement the format. BLOCKER-1."
+      "notes": "No longer split: at the pinned sha both verify and append are exported. Add-LedgerRecord is defined at ledger.psm1:298, named in FunctionsToExport at ledger.psd1:9 and in Export-ModuleMember at ledger.psm1:1121-1122, and Get-Command -Module ledger lists it. hooks/sentinel.ps1 calls it as a plain exported command; the module-session-state reach it used while the export was absent was removed on 2026-09-23, and the exception row that recorded that absence was retired from this file in the same change. No hash algorithm, receipt byte layout or record schema is asserted here: the sentinel writes through the module and does not reimplement the format."
     },
     {
       "id": "inspector",
@@ -88,13 +88,6 @@
       "statement": "A hook permissionDecision is ignored when the tool sits in permissions.allow (claude-code#18312). Designed around rather than fixed: permissions.allow is empty in both images and entrypoint.ps1 exits 11 if a gated tool ever appears there.",
       "status": "accepted",
       "evidence": "prompts/assessment.2026-09-21.json marks it an open bug; entrypoint.ps1 allow-list scan"
-    },
-    {
-      "id": "ledger-append-not-exported",
-      "statement": "The receipt-append function is not part of the Ledger module public surface, so the sentinel depends on a private name. The fix belongs in claude.build.ledger.",
-      "status": "blocker",
-      "blocker": "BLOCKER-1",
-      "evidence": "Ledger.psm1:298 defines Add-LedgerRecord; Ledger.psd1 FunctionsToExport omits it"
     },
     {
       "id": "installer-not-hash-pinned",
