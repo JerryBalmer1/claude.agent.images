@@ -10,6 +10,102 @@ fails the build rather than being believed.
 
 ---
 
+## 2026-09-23 5d48942 run-01
+
+The skip-justification gate and the conditional skip stop colliding.
+
+**Changed:**
+
+- **A second justified form on the gate.** `build/InContainer.Test.ps1` and
+  `Assert-SuiteClean` in `build/tasks/Test.build.ps1` tolerated a skipped test
+  only if it carried a `BLOCKER-n` tag. They now also accept
+  `SkipWhen:<kebab-reason>`, matched by
+  `^SkipWhen:(?<reason>[a-z0-9]+(-[a-z0-9]+)*)$`. Both forms are read off the
+  Pester test object — its own tags plus every parent block's — so the
+  justification is a thing the gate measures rather than a comment nobody
+  executes.
+- **Why not `BLOCKER-n`.** A blocker is a defect someone intends to repair and
+  strike, and this repository is retiring them (seq 9, `blocker-1-retired`).
+  "No exempt commit in range" is not a defect. It is a state this tree is in on
+  most days and will re-enter whenever the pull-request range holds no
+  grandfathered commit, so filing it as a blocker would mean carrying it on the
+  standing list forever for something nobody plans to leave.
+- **The two tests are tagged, not excused.** `tests/Trailers.Tests.ps1` — the
+  Co-Authored-By falsification and the empty-exemption-list falsification —
+  each carry `-Tag 'SkipWhen:no-exempt-commit-in-range'` beside the existing
+  `-Skip:$NothingToFalsify` from `47e2031`. The tag is on the two `It`s and not
+  on the `Describe`, because the sibling "passes, using the exemption" does not
+  skip and must not inherit a justification it never needed.
+- **The gates now report WHY.** Both print justified skips grouped by reason.
+  `output/incontainer.json` gains `justified_skips[]`, each entry carrying
+  `test`, `result` and `reason`; `unjustified_skips` keeps its meaning and is
+  now empty. A green log that says "skipped: 2" tells a reader nothing they can
+  act on.
+- **The rule is written once.** `Get-SkipJustification` lives in
+  `build/Build.Helpers.psm1` — plain PowerShell, no Invoke-Build dependency,
+  which is why the container can import it from the `/work` bind mount. The two
+  gates remain two implementations and still differ on `NotRun`: the container
+  run carries an `ExcludeTag` filter and the host run does not. They no longer
+  differ on what a justification *is*.
+
+**Tested:** passed=150 failed=0 skipped=2 — in-container, `pwsh 7.6.6`,
+Pester 6.1.0, uid 1001, 21 Docker-tagged tests `NotRun` by design and excluded
+from both skip lists. Host `Test.Unit`: passed=171 failed=0 skipped=2
+NotRun=0 Inconclusive=0. Before this change both runs were exit 1 on those same
+numbers; only the verdict on the two skips moved.
+
+**Failed:** none.
+
+**Missing:**
+
+- The gate is still not in the CI required set. That is I7, explicitly out of
+  scope here, so `config/repo.json -> required_checks` is untouched.
+- `scripts/state.ps1` still refuses to run in this repository — it asserts the
+  origin is `claude.pwsh.image.builder` and exits 1. Every state block in this
+  run, including the one in the pull request, is hand-assembled. Listed, not
+  fixed.
+- `scripts/ci/Test-PushGuard.ps1:44` names `config/trailer-grandfather.txt` in
+  its doc comment; the file is at `.continuity/trailer-grandfather.txt`. A
+  stale path in prose, no behaviour attached. Listed, not fixed.
+- `docs/plans/ACTIVE.md` still describes `feature/env-local` from 2026-09-21,
+  two features ago. `AGENTS.md`'s stale-plan STOP is recorded as SUSPENDED in
+  the disagreement table on the grounds that the file does not exist; it does
+  exist. Listed, not fixed — deciding it is not this run's job.
+
+**Blockers:**
+
+- **No signing key.** Not touched. Nothing signs anything; `actor` and
+  `LEDGER_PRINCIPAL` are operator-asserted and are places to be caught lying,
+  not signatures.
+- **Command-hook timeout fails open.** Not touched. The 15s PreToolUse timeout
+  is Claude Code semantics; a sentinel that hangs is a sentinel that is not
+  consulted.
+- The receipt-append export blocker was struck on 2026-09-23 at seq 9 and is
+  not relisted; see the 2026-09-21 section for its history.
+
+**Ledger head hash:** `ade4061216bd49047c169c95b23ae0eb4b508114c19180ae1a622d5204f6b3ea`
+(3 receipts at `output/ledger/ledger.jsonl`, written by the sentinel baked into
+the image and verified by `Get-LedgerVerify`. It moves on every
+`Test.InContainer` — receipts accumulate by design — so `Goal.Update` checks
+its shape, not its value.)
+
+**Assessment hash:** `798b10ee3ca2d64b28bc779611484ddc0565448c6468ae2ddaf54a53a98030a3`
+— canonical sha256 of `prompts/assessment.2026-09-21.json`, unchanged by this
+run and re-verified by `Bootstrap`.
+
+**Forensic chain:** the decision was recorded *before* the edit, at seq 10,
+`kind=decision`, `subject=skip-justification-form`, `prev f05b175d`,
+`self f88886e6`. `Goal.Update` appends its own `verification` record at the end
+of this run, so this run adds two records, not one.
+
+**Falsified, because a gate that only ever says yes is the honour system with
+extra steps.** A scratch untracked `tests/Scratch.Falsify.Tests.ps1` carrying
+one skip with no tag and one tagged `SkipWhen:NotAKebabReason` — a spelling the
+pattern rejects — drove both gates red: `Test.Unit` exit 1 and
+`Test.InContainer` exit 1, each naming both scratch skips while still reporting
+the two real ones as justified. skipped=4 in both runs. The scratch was then
+removed and the tree verified clean.
+
 ## 2026-09-21 06e738d run-01
 
 Getting the image from "a hook exists" to "the hook is proven".

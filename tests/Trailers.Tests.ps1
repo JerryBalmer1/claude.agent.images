@@ -23,6 +23,20 @@
     discovery block below - so on today's tree they prove nothing, and that is stated rather
     than relied on.
 
+    THE SKIP IS DECLARED ON THE TEST, NOT IN THIS COMMENT. Both falsifications carry
+    Tag 'SkipWhen:no-exempt-commit-in-range'. The suite gate - build/tasks/Test.build.ps1
+    on the host, build/InContainer.Test.ps1 in the image, sharing Get-SkipJustification
+    from build/Build.Helpers.psm1 - reads that tag off the test object and prints the
+    reason beside the test. An untagged skip still turns both gates red. What you are
+    reading now is prose: nothing executes it, so nothing goes red when it stops being
+    true, which is exactly why it is not the justification.
+
+    NOT BLOCKER-n, which is the other form the gate accepts. A blocker is a defect
+    someone intends to repair and strike. This is a precondition that is legitimately
+    unmet on most days and will be unmet again the next time the range holds no
+    grandfathered commit. Filing it as a blocker would mean carrying it on the standing
+    blocker list forever, for a state nobody plans to leave.
+
     NOTE ON RANGES, learned the expensive way in claude.agent.substrate. These run against
     `-Base origin/develop`, never full history with -IncludeMerges. On a pull request,
     actions/checkout hands you refs/pull/N/merge - a merge commit GitHub synthesises, which
@@ -123,7 +137,8 @@ Describe 'the trailer guard over the pull-request range' {
         $r.ExitCode | Should -Be 0
     }
 
-    It 'rejects a Co-Authored-By trailer, which the CI port would otherwise have dropped' -Skip:$NothingToFalsify {
+    It 'rejects a Co-Authored-By trailer, which the CI port would otherwise have dropped' `
+        -Tag 'SkipWhen:no-exempt-commit-in-range' -Skip:$NothingToFalsify {
         # develop's ci.yml had a dedicated "no Co-Authored-By" step. Porting substrate's CI
         # wholesale would have lost it silently, so it is folded into the trailer guard. This
         # proves it can actually fail: an empty exemption list means the eight run-01 commits
@@ -138,7 +153,8 @@ Describe 'the trailer guard over the pull-request range' {
         finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
     }
 
-    It 'fails with an empty exemption list, so the list is load-bearing rather than decorative' -Skip:$NothingToFalsify {
+    It 'fails with an empty exemption list, so the list is load-bearing rather than decorative' `
+        -Tag 'SkipWhen:no-exempt-commit-in-range' -Skip:$NothingToFalsify {
         # THE FALSIFICATION. A guard that exempted everything would pass the test above forever.
         $tmp = Join-Path ([System.IO.Path]::GetTempPath()) "gf-empty-$([guid]::NewGuid()).txt"
         Set-Content -LiteralPath $tmp -Value '' -Encoding utf8

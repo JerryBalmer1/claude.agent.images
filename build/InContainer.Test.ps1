@@ -23,6 +23,18 @@
     that justifies it. "No test may be marked Skip or Pending without a
     BLOCKER-n reference" is otherwise an honour-system rule, and the honour
     system is what produced a green suite with a fake validator in it.
+
+.PARAMETER SkipWhenTagPattern
+    The second justified form, for a skip that is not waiting on a blocker at
+    all. A precondition test — one that can only falsify something when the
+    repository is in a particular state — is skipped on the days it is not,
+    and that is correct rather than owed. BLOCKER-n cannot say so: blockers
+    are defects awaiting repair, and this is a condition nobody intends to
+    "fix".
+
+    The reason travels in the tag, after the colon, so the gate can print WHY
+    each test did not run. Both forms are read off the test object. A comment
+    is not a measurement, and is therefore never accepted as a justification.
 #>
 
 [CmdletBinding()]
@@ -38,6 +50,11 @@ param(
 
     [Parameter()]
     [string]$BlockerTagPattern = '^BLOCKER-\d+$',
+
+    # The 'reason' named group is what gets printed and written to the summary. Keep it
+    # if this is ever overridden. See Get-SkipJustification in build/Build.Helpers.psm1.
+    [Parameter()]
+    [string]$SkipWhenTagPattern = '^SkipWhen:(?<reason>[a-z0-9]+(-[a-z0-9]+)*)$',
 
     # BLOCKER-6. The runtime floor is declared ONCE, in InContainer.Bootstrap.ps1, and read
     # from there. It used to be a second independent '7.6' literal here, which meant the two
@@ -93,6 +110,12 @@ if ($PSVersionTable.PSVersion -lt $MinimumPSVersion) {
 Import-Module Pester -MinimumVersion 6.0.0 -ErrorAction Stop
 Write-Output "[in-container] Pester $((Get-Module Pester).Version)"
 
+# The skip-justification RULE is shared with the host gate rather than reimplemented
+# here. This module is plain PowerShell — it exists so the helpers can be exercised
+# without Invoke-Build — and the repository is bind-mounted, so $PSScriptRoot resolves
+# it inside the container exactly as it does on the host.
+Import-Module (Join-Path $PSScriptRoot 'Build.Helpers.psm1') -Force -ErrorAction Stop
+
 $resultDir = Split-Path -Parent $ResultPath
 if ($resultDir -and -not (Test-Path -LiteralPath $resultDir)) {
     [void](New-Item -ItemType Directory -Path $resultDir -Force)
@@ -128,17 +151,47 @@ function Get-InheritedTag {
     return @($tags | Where-Object { $_ })
 }
 
-$unjustified = @(
-    $result.Tests | Where-Object {
+$verdicts = @(
+    $result.Tests | ForEach-Object {
+        if ($_.Result -notin @('Skipped', 'Inconclusive', 'NotRun')) { return }
+
         $tags = Get-InheritedTag -Test $_
-        $hasBlocker = [bool](@($tags) | Where-Object { $_ -match $BlockerTagPattern })
         $excludedByTag = [bool](@($tags) | Where-Object { $ExcludeTag -contains $_ })
 
-        ($_.Result -eq 'Skipped' -and -not $hasBlocker) -or
-        ($_.Result -eq 'Inconclusive') -or
-        ($_.Result -eq 'NotRun' -and -not $excludedByTag -and -not $hasBlocker)
+        # A test the filter excluded did not skip — it was never part of this run, and it
+        # belongs in neither list. This is what keeps the 21 Docker-tagged tests out of
+        # the report instead of parading them as justified skips.
+        if ($_.Result -eq 'NotRun' -and $excludedByTag) { return }
+
+        # Inconclusive deliberately gets no tag escape. It means an assertion gave up
+        # part-way through, which is not a precondition anyone declared in advance.
+        $reason = if ($_.Result -eq 'Inconclusive') { $null }
+                  else {
+                      Get-SkipJustification -Tag $tags `
+                          -BlockerPattern $BlockerTagPattern `
+                          -SkipWhenPattern $SkipWhenTagPattern
+                  }
+
+        [pscustomobject]@{
+            test   = $_.ExpandedPath
+            result = [string]$_.Result
+            reason = $reason
+        }
     }
 )
+
+$unjustified = @($verdicts | Where-Object { -not $_.reason })
+$justified   = @($verdicts | Where-Object { $_.reason })
+
+# A skip nobody can see the reason for is barely better than a silent one. Grouped by
+# reason so the log answers "why did this not run", not just "this did not run".
+if ($justified.Count -gt 0) {
+    Write-Output "[in-container] $($justified.Count) justified skip(s):"
+    foreach ($group in ($justified | Group-Object -Property reason | Sort-Object -Property Name)) {
+        Write-Output "[in-container]   $($group.Name)"
+        foreach ($t in $group.Group) { Write-Output "[in-container]     - $($t.test)" }
+    }
+}
 
 # ---------------------------------------------------------------- ledger head
 #
@@ -176,7 +229,13 @@ $summary = [ordered]@{
     ps_version         = $PSVersionTable.PSVersion.ToString()
     pester_version     = (Get-Module Pester).Version.ToString()
     uid                = $uid
-    unjustified_skips  = @($unjustified | ForEach-Object { $_.ExpandedPath })
+    unjustified_skips  = @($unjustified | ForEach-Object { $_.test })
+
+    # Reported, not merely tolerated. Whoever reads this file after a green run can see
+    # which tests did not run and on what stated grounds, without opening the suite.
+    justified_skips    = @($justified | ForEach-Object {
+        [ordered]@{ test = $_.test; result = $_.result; reason = $_.reason }
+    })
 }
 $summary | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath "$ResultPath.json" -Encoding utf8
 
@@ -189,7 +248,10 @@ if ($result.FailedCount -gt 0) {
 }
 
 if ($unjustified.Count -gt 0) {
-    foreach ($t in $unjustified) { Write-Error "[in-container] skipped without a BLOCKER-n tag: $($t.ExpandedPath)" }
+    foreach ($t in $unjustified) {
+        Write-Error ("[in-container] {0} with no justification tag (BLOCKER-n or SkipWhen:<reason>): {1}" -f
+            $t.result.ToLowerInvariant(), $t.test)
+    }
     exit 1
 }
 

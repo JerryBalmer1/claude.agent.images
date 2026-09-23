@@ -92,10 +92,24 @@ task Test.InContainer Build.Image, {
         $summary.ps_version, $summary.pester_version, $summary.uid)
     Write-Build Cyan ("Ledger head: {0}" -f $summary.ledger_head)
 
+    # The container gate already decided which skips were justified; this end reports
+    # them, so the reason survives into the host log rather than only into the JSON.
+    # Guarded: a summary written before justified_skips existed is still readable, and
+    # StrictMode would otherwise turn an old artefact into a parse error.
+    $justified = @()
+    if ($summary.PSObject.Properties.Name -contains 'justified_skips') {
+        $justified = @($summary.justified_skips)
+    }
+    foreach ($group in ($justified | Group-Object -Property reason | Sort-Object -Property Name)) {
+        Write-Build Yellow ("Container: skipped — $($group.Name):")
+        foreach ($t in $group.Group) { Write-Build DarkGray "    $($t.test)" }
+    }
+
     if ($summary.uid -eq '0') { throw 'the in-container suite ran as root; it proves nothing about the leash' }
     if ($summary.failed -gt 0) { throw "$($summary.failed) test(s) failed inside the container" }
     if (@($summary.unjustified_skips).Count -gt 0) {
-        throw ("skipped without a BLOCKER-n tag: " + (@($summary.unjustified_skips) -join ', '))
+        throw ("no justification tag (BLOCKER-n or SkipWhen:<reason>) on: " +
+            (@($summary.unjustified_skips) -join ', '))
     }
     if ($summary.passed -eq 0) { throw 'no tests ran inside the container; that is a failure, not a pass' }
 
@@ -105,7 +119,8 @@ task Test.InContainer Build.Image, {
 function Assert-SuiteClean {
     <#
     .SYNOPSIS
-        Fail on any failed test, and on any skip that does not name a blocker.
+        Fail on any failed test, and on any skip that does not state its reason
+        on the test object. Report the skips that do.
     #>
     param(
         [Parameter(Mandatory)]$Result,
@@ -122,21 +137,44 @@ function Assert-SuiteClean {
 
     # 'NotRun' is how Pester reports a test excluded by a tag filter, which is
     # not a skip and must not be counted as one. Test.Unit excludes nothing, so
-    # any NotRun here really is unexplained.
-    $unjustified = @(
-        $Result.Tests | Where-Object {
+    # any NotRun here really is unexplained — and neither tag form excuses one.
+    #
+    # The RULE for what counts as a justification lives in Build.Helpers.psm1 and
+    # is shared with build/InContainer.Test.ps1. The two gates still differ on
+    # NotRun, deliberately: that run carries an ExcludeTag filter and this one does
+    # not. What they no longer get to differ on is what a justification IS.
+    $verdicts = @(
+        $Result.Tests | ForEach-Object {
+            if ($_.Result -notin @('Skipped', 'Inconclusive', 'NotRun')) { return }
+
             $tags = @($_.Tag)
             $block = $_.Block
             while ($block) { $tags += @($block.Tag); $block = $block.Parent }
-            $hasBlocker = [bool](@($tags) | Where-Object { $_ -match '^BLOCKER-\d+$' })
 
-            ($_.Result -eq 'Skipped' -and -not $hasBlocker) -or
-            ($_.Result -in @('Inconclusive', 'NotRun'))
+            $reason = if ($_.Result -eq 'Skipped') { Get-SkipJustification -Tag $tags } else { $null }
+
+            [pscustomobject]@{
+                Test   = $_.ExpandedPath
+                Result = [string]$_.Result
+                Reason = $reason
+            }
         }
     )
+
+    $unjustified = @($verdicts | Where-Object { -not $_.Reason })
+    $justified   = @($verdicts | Where-Object { $_.Reason })
+
+    # WHY, not just how many. A green log that says "skipped: 2" tells a reader
+    # nothing they can act on; grouped by reason, it tells them what precondition
+    # was unmet and therefore what would have to change for those tests to run.
+    foreach ($group in ($justified | Group-Object -Property Reason | Sort-Object -Property Name)) {
+        Write-Build Yellow ("${Where}: skipped — $($group.Name):")
+        foreach ($t in $group.Group) { Write-Build DarkGray "    $($t.Test)" }
+    }
+
     if ($unjustified.Count -gt 0) {
-        throw ("${Where}: skipped without a BLOCKER-n tag:`n  " +
-            (@($unjustified | ForEach-Object { $_.ExpandedPath }) -join "`n  "))
+        throw ("${Where}: no justification tag (BLOCKER-n or SkipWhen:<reason>) on:`n  " +
+            (@($unjustified | ForEach-Object { "$($_.Result.ToLowerInvariant()) — $($_.Test)" }) -join "`n  "))
     }
 
     if ($Result.PassedCount -eq 0) {
