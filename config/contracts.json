@@ -32,7 +32,7 @@
       "emits": ["Get-LedgerVerify result", "chain head hash"],
       "gates": "container boot, via entrypoint.ps1 exit 14",
       "evidence": [
-        "vendor/claude.agent.substrate at 3933dccf4013f9427a2e14206899ec8eede155cd (tag v0.1.0)",
+        "vendor/claude.agent.core at a68664e6b9938773478d967348b590f487fe2443 (Merge pull request #27; v0.2.1 is not cut)",
         "modules/ledger/ledger.psd1 FunctionsToExport = Invoke-LedgerForce, Get-LedgerStatus, Get-LedgerVerify, Get-LedgerEntry",
         "entrypoint.ps1 calls Get-LedgerVerify and exits 14 on a broken chain"
       ],

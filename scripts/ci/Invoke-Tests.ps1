@@ -79,15 +79,15 @@ $excludeTag = @('Docker')
 # not perform and why. Degrading visibly beats either a red build nobody can fix without a
 # credential, or a green one that quietly proved less than it claims.
 #
-# The real fix is a PAT with read access to claude.agent.substrate, stored as a repository secret
+# The real fix is a PAT with read access to claude.agent.core, stored as a repository secret
 # and passed to actions/checkout as `token:`. That is Jerry's to create. FINDING-M17.
-$ledgerManifest = Join-Path $RepoRoot 'vendor/claude.agent.substrate/modules/ledger/ledger.psd1'
+$ledgerManifest = Join-Path $RepoRoot 'vendor/claude.agent.core/modules/ledger/ledger.psd1'
 if (-not (Test-Path -LiteralPath $ledgerManifest)) {
     $excludeTag += 'Ledger'
     Write-Host ''
     Write-Host 'pester: WARNING -- the vendored Ledger module is NOT present.'
     Write-Host "pester:   expected  $ledgerManifest"
-    Write-Host 'pester:   cause     vendor/claude.agent.substrate is a private submodule and the'
+    Write-Host 'pester:   cause     vendor/claude.agent.core is a private submodule and the'
     Write-Host 'pester:             workflow GITHUB_TOKEN cannot clone another repository.'
     Write-Host 'pester:   effect    every Ledger-tagged test is EXCLUDED from this run.'
     Write-Host 'pester:   fix       a PAT with read access, as a repo secret, passed to'

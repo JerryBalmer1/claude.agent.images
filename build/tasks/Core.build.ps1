@@ -25,10 +25,10 @@ task Bootstrap {
     Write-Build Green "Assessment verified: $sha"
 
     # ---- the snake ------------------------------------------------------
-    $ledgerRoot = Join-Path $Build.RepositoryRoot 'vendor' 'claude.agent.substrate'
+    $ledgerRoot = Join-Path $Build.RepositoryRoot 'vendor' 'claude.agent.core'
     $manifest = Join-Path $ledgerRoot 'modules' 'ledger' 'ledger.psd1'
     if (-not (Test-Path -LiteralPath $manifest)) {
-        throw "Vendored substrate missing: $manifest. Run: git submodule update --init"
+        throw "Vendored core missing: $manifest. Run: git submodule update --init"
     }
     $ledgerCommit = exec { git -C $ledgerRoot rev-parse --short HEAD }
     Write-Build Green "Ledger vendored at $ledgerCommit"
