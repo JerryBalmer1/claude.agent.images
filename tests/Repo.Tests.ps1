@@ -1,7 +1,15 @@
 #Requires -Version 7.4
 <#
     Assertions about the shape of the repository, from the cleanup pass: BLOCKER-11 (one
-    END_GOAL.md), CODEOWNERS, and the .agents/ scaffold.
+    END_GOAL.md), CODEOWNERS, and the sweep for stale BREADCRUMBS paths.
+
+    RETIRED, 2026-09-23. Three tests here asserted the per-agent scaffold that this repository
+    did not inherit: the birth pruned it, so nothing in this tree could ever make them go
+    green and nothing in this tree could make them go red either. Forensic seq 8, subject
+    prebirth-tests-retired, names all three and the birth record they trace to. They were
+    removed, not skipped and not rewritten to pass: an assertion with no falsifier here is not
+    a test. What survives below is the one assertion that still has one - a content sweep over
+    tracked files, which any future commit can falsify by reintroducing the old path.
 
     These are measured against the GIT INDEX, not the working tree. `git ls-files` is what the
     repository actually contains; a Get-ChildItem sweep also finds untracked scratch, build
@@ -64,27 +72,7 @@ Describe 'CODEOWNERS' {
     }
 }
 
-Describe 'the .agents/ scaffold' {
-
-    It 'has one folder per agent, each kept' {
-        foreach ($a in 'claude', 'grok', 'fable') {
-            (Join-Path $script:RepoRoot ".agents/$a/.gitkeep") | Should -Exist
-        }
-    }
-
-    It 'has a README that states how identity actually works here' {
-        # The protocol is the point of the folder. A scaffold with no rules in it is three empty
-        # directories.
-        $text = [System.IO.File]::ReadAllText((Join-Path $script:RepoRoot '.agents/README.md'))
-        $text | Should -Match 'who:'
-        $text | Should -Match 'operator-asserted'
-        $text | Should -Match 'parking rule'
-    }
-
-    It 'moved BREADCRUMBS.md out of docs/ and left nothing behind' {
-        (script:Get-TrackedFiles) | Should -Contain '.agents/BREADCRUMBS.md'
-        (script:Get-TrackedFiles) | Should -Not -Contain $script:OldCrumbPath
-    }
+Describe 'stale BREADCRUMBS references' {
 
     It 'has no reference left pointing at the old path' {
         # THE OLD PATH IS ASSEMBLED AT RUNTIME AND NEVER WRITTEN AS ONE LITERAL IN THIS FILE.
