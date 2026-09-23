@@ -137,15 +137,15 @@ Describe 'Dockerfile pins (static)' {
         @{ File = 'images/developer/Dockerfile' }
     ) {
         $text = Get-Content -LiteralPath (Join-Path $script:RepoRoot $File) -Raw
-        # Option A. substrate ships modules/ledger/ledger.psd1 LOWERCASE; the in-container
+        # Option A. core ships modules/ledger/ledger.psd1 LOWERCASE; the in-container
         # contract -- entrypoint.ps1, hooks/sentinel.ps1, build/InContainer.Test.ps1 -- asks for
         # /opt/leash/ledger/Ledger.psd1. On Linux that is a hard break, and it was measured, not
         # argued: with a plain directory COPY, Test-Path /opt/leash/ledger/Ledger.psd1 returned
         # False and Import-Module failed. So the manifest is RENAMED in the COPY and no runtime
         # file is edited. Asserting all three lines is asserting the repair.
-        $text | Should -Match 'COPY vendor/claude\.agent\.substrate/modules/ledger/ledger\.psd1 /opt/leash/ledger/Ledger\.psd1'
-        $text | Should -Match 'COPY vendor/claude\.agent\.substrate/modules/ledger/ledger\.psm1 /opt/leash/ledger/ledger\.psm1'
-        $text | Should -Match 'COPY vendor/claude\.agent\.substrate/modules/ledger/python/ /opt/leash/ledger/python/'
+        $text | Should -Match 'COPY vendor/claude\.agent\.core/modules/ledger/ledger\.psd1 /opt/leash/ledger/Ledger\.psd1'
+        $text | Should -Match 'COPY vendor/claude\.agent\.core/modules/ledger/ledger\.psm1 /opt/leash/ledger/ledger\.psm1'
+        $text | Should -Match 'COPY vendor/claude\.agent\.core/modules/ledger/python/ /opt/leash/ledger/python/'
     }
 
     It 'uses the PowerShell entrypoint, not the deleted shell one' -ForEach @(

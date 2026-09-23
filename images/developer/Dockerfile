@@ -96,14 +96,14 @@ COPY entrypoint.ps1 /opt/leash/entrypoint.ps1
 
 # Same vendored Ledger as the leash image. The developer image observes rather
 # than denies, but it still writes receipts, so it still needs the snake.
-# substrate ships modules/ledger/ledger.psd1 (lowercase); the in-container contract is
+# core ships modules/ledger/ledger.psd1 (lowercase); the in-container contract is
 # /opt/leash/ledger/Ledger.psd1, and on Linux that difference is a hard break -- measured:
 # with a plain directory COPY, Test-Path /opt/leash/ledger/Ledger.psd1 is False and
 # Import-Module fails. The files are therefore copied individually under the names the
 # contract already expects. RootModule is 'ledger.psm1', so only the manifest is renamed.
-COPY vendor/claude.agent.substrate/modules/ledger/ledger.psd1 /opt/leash/ledger/Ledger.psd1
-COPY vendor/claude.agent.substrate/modules/ledger/ledger.psm1 /opt/leash/ledger/ledger.psm1
-COPY vendor/claude.agent.substrate/modules/ledger/python/ /opt/leash/ledger/python/
+COPY vendor/claude.agent.core/modules/ledger/ledger.psd1 /opt/leash/ledger/Ledger.psd1
+COPY vendor/claude.agent.core/modules/ledger/ledger.psm1 /opt/leash/ledger/ledger.psm1
+COPY vendor/claude.agent.core/modules/ledger/python/ /opt/leash/ledger/python/
 
 RUN chown -R root:root /opt/leash && chmod -R 0555 /opt/leash
 
