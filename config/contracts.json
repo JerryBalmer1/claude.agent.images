@@ -27,16 +27,16 @@
     },
     {
       "id": "ledger",
-      "status": "known-but-split",
+      "status": "known",
       "consumes": ["receipts", "LEDGER_PRINCIPAL", "the existing chain"],
       "emits": ["Get-LedgerVerify result", "chain head hash"],
       "gates": "container boot, via entrypoint.ps1 exit 14",
       "evidence": [
         "vendor/claude.agent.core at a68664e6b9938773478d967348b590f487fe2443 (Merge pull request #27; v0.2.1 is not cut)",
-        "modules/ledger/ledger.psd1 FunctionsToExport = Invoke-LedgerForce, Get-LedgerStatus, Get-LedgerVerify, Get-LedgerEntry",
+        "modules/ledger/ledger.psd1 FunctionsToExport = Invoke-LedgerForce, Get-LedgerStatus, Get-LedgerVerify, Get-LedgerEntry, Add-LedgerRecord",
         "entrypoint.ps1 calls Get-LedgerVerify and exits 14 on a broken chain"
       ],
-      "notes": "Split because verify is exported and append is not. Add-LedgerRecord exists at Ledger.psm1:298 and is absent from Export-ModuleMember at Ledger.psm1:1121, so hooks/sentinel.ps1 reaches it through module session state. No hash algorithm, receipt byte layout or record schema is asserted here: the sentinel writes through the module and does not reimplement the format. BLOCKER-1."
+      "notes": "No longer split: at the pinned sha both verify and append are exported. Add-LedgerRecord is defined at ledger.psm1:298, named in FunctionsToExport at ledger.psd1:9 and in Export-ModuleMember at ledger.psm1:1121-1122, and Get-Command -Module ledger lists it. BLOCKER-1 is cleared upstream; the exception row below and its nine other references are retired separately, not here. hooks/sentinel.ps1 still reaches the function through module session state, which is now backed by the public surface rather than working around its absence. No hash algorithm, receipt byte layout or record schema is asserted here: the sentinel writes through the module and does not reimplement the format. BLOCKER-1."
     },
     {
       "id": "inspector",
