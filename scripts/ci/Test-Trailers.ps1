@@ -41,12 +41,22 @@
 
     The exemption is BY EXACT HASH and nothing else. Not by date, not by author, not by a
     pattern, not by "everything before commit X". Those all quietly widen over time; a list of
-    forty-character strings has a length you can assert, and tests/Trailers.Tests.ps1 asserts it.
+    forty-character strings is a thing tests/Trailers.Tests.ps1 can constrain, and it does: it
+    requires every entry to be a real commit in this repository that genuinely lacks a trailer,
+    so the list cannot be padded with compliant hashes to make room for one that is not.
 
-    An absent grandfather file is treated as an EMPTY list, loudly, never as permission. The
+    IN THIS REPOSITORY THE LIST IS EMPTY and the file is 0 bytes. The commits it named in
+    claude.pwsh.image.builder were not carried over at birth; every commit here carries the
+    trailer, so nothing needs exempting and the guard passes with a count of zero. The test
+    that asserted a count of twenty-four was retired on 2026-09-23 (forensic seq 8, subject
+    prebirth-tests-retired) because those commits are not in this tree.
+
+    An absent grandfather file is treated as an EMPTY list, loudly, never as permission - the
     quietest possible failure mode for an exemption list is for its deletion to make everything
-    pass, and that is exactly what does not happen here: delete the file and a full-history run
-    goes red on the seed commit.
+    pass. On the lineage this was written for, deleting the file turned a full-history run red
+    on the seed commit. THAT IS NO LONGER THE DEMONSTRATION HERE, and saying so beats leaving a
+    claim that measures false: with the list already empty, a full-history run passes either
+    way. What is left is the WARNING on stdout, which names the missing path.
 
     -Base is OPTIONAL. Without it the range is every commit reachable from -Head, root included,
     which is the run the grandfather file exists to make possible. With it the range is
@@ -145,9 +155,12 @@ try {
         # DISCUSS the rule, which is how the original guard first failed - on the commit that
         # added it.
         #
-        # Grandfathered commits never reach this line, and that is deliberate: eight run-01
-        # commits carry Co-Authored-By and cannot be repaired without rewriting pushed history
-        # that the forensic chain cites. All eight are already in the exemption list.
+        # Grandfathered commits never reach this line, and that is deliberate: on the lineage
+        # this came from, eight run-01 commits carried Co-Authored-By and could not be repaired
+        # without rewriting pushed history that the forensic chain cites, so all eight sat in
+        # the exemption list. None of those commits are in this repository and the list here is
+        # empty, so today every commit in range reaches this check. The ordering is kept anyway:
+        # it is what makes an exemption survivable if one is ever needed again.
         if ($body -match '(?im)^co-authored-by:') {
             Write-Host "  COAUTH $short  carries a Co-Authored-By trailer, which AGENTS.md forbids  -- $subject"
             $bad.Add($sha); continue
