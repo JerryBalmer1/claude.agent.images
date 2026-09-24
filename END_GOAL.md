@@ -10,6 +10,56 @@ fails the build rather than being believed.
 
 ---
 
+## 2026-09-23 0807b9f run-01
+
+I13 PR 3, `feature/ci-network-resilience`: CI builds the images once per run, from a cache keyed on
+their inputs, and apt retries with a bounded backoff.
+
+**Changed:**
+
+- Both Dockerfiles: the apt layer makes five attempts, sleeping 2, 8, 18 and 32 seconds between them,
+  then exits 1. It uses `update --error-on=any`. With `--network none` in the pinned base: five
+  attempts, 96s, exit 1.
+- `Get-ImageInputHash` and `Invoke-ImageBuild` in `build/Build.Helpers.psm1`. An image labelled with the
+  hash of its inputs is reused, not rebuilt. `Build.Image` and `tests/Image.Tests.ps1` build through it.
+- `ci.yml`: a new `images` job builds and saves only on a cache miss, using `actions/cache`.
+  `pester` and `incontainer` need it and load its images. `images` is a required check, and
+  `docs/POLICY.md` and the PR template are regenerated.
+- `scripts/ci/Invoke-ImageCache.ps1` and `tests/ImageCache.Tests.ps1` (14 cases, red at `8bd59df`:
+  1 passed, 13 failed).
+
+**Tested:** passed=219 failed=0 skipped=6 - in-container, `pwsh 7.6.6`, Pester 6.1.0, uid 1001,
+wall 39.17s, `not_loaded` empty, `unjustified_skips` empty. Host: 246 / 0 / 2. Both images were
+rebuilt with the new apt layer once, in `tests/Image.Tests.ps1`. `Build.Image` then reused them,
+because their inputs were identical.
+
+**Failed:** none.
+
+**Missing:**
+
+- The postcondition (two consecutive CI runs on one commit, the second a cache hit that never reaches
+  `archive.ubuntu.com`) is measured after this commit is pushed. It is recorded in the PR body and
+  on the forensic chain, not here.
+- Cache scope: a `pull_request` run can restore caches from its own ref, its base branch and `main`.
+  It can't restore from its head branch. A PR's first run therefore builds once, unless `main` or
+  `develop` already holds the key.
+- A reused image keeps what the network returned when it was built: apt package versions, and
+  `CLAUDE_CODE_VERSION=latest`.
+
+**Blockers:**
+
+- **No signing key.** Not touched. Identity is operator-asserted.
+- **Command-hook timeout fails open.** Not touched. 15s PreToolUse, Claude Code semantics.
+- The receipt-append export blocker was struck on 2026-09-23 at seq 9 and is not relisted.
+
+**Ledger head hash:** `e1169ae06170b24a09ae9e2b964e94af6297202ea5635149841e255c8ffe7059`
+(shape checked, not value.)
+
+**Assessment hash:** `798b10ee3ca2d64b28bc779611484ddc0565448c6468ae2ddaf54a53a98030a3`
+- canonical sha256 of `prompts/assessment.2026-09-21.json`, unchanged and re-verified by `Bootstrap`.
+
+**Forensic chain:** `Goal.Update` appends its own `verification` record.
+
 ## 2026-09-23 756b356 run-01
 
 I13 PR 2, `feature/root-cause-23b1db9`: what corrupted `END_GOAL.md` in `23b1db9` is named, reproduced, and
