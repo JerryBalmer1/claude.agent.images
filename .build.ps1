@@ -27,6 +27,10 @@
 .PARAMETER Preview
     Show what a state-changing task would do, without doing it.
 
+.PARAMETER NoCache
+    Build both images cold: no reuse of a tagged image, no layer cache, base re-pulled
+    (docker build --no-cache --pull). Other projects' build cache is not touched.
+
 .EXAMPLE
     Invoke-Build
     Runs the default chain.
@@ -45,7 +49,9 @@ param(
 
     [switch]$SkipBootstrap,
 
-    [switch]$Preview
+    [switch]$Preview,
+
+    [switch]$NoCache
 )
 
 Set-StrictMode -Version Latest
@@ -66,6 +72,7 @@ $script:Build = [pscustomobject]@{
     Configuration  = $Configuration
     WhatIf         = [bool]$Preview
     SkipBootstrap  = [bool]$SkipBootstrap
+    NoCache        = [bool]$NoCache
 
     # run-01. Pinned here so no task carries a literal tag or version.
     LeashTag       = 'claude.pwsh.image.leash:run-01'
