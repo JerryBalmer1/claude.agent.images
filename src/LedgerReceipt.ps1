@@ -3,7 +3,8 @@ $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
 
 # Thin receipt rail for the leash hook. Does not replace the snake.
-# Prefers Get-LedgerVerify from vendor/claude.build.ledger when loaded.
+# Prefers Get-LedgerVerify from claude.agent.core's ledger module when it is found:
+# /opt/leash/ledger/Ledger.psd1 in the images, vendor/claude.agent.core on the host.
 # Fallback is a prev/self SHA-256 JSONL at /ledger/sentinel.jsonl.
 
 function Get-ReceiptSha256 {
@@ -98,15 +99,21 @@ function Test-SentinelChain {
 }
 
 function Invoke-LedgerBootVerify {
+    # Core's ledger module, where each context actually has it. Both Dockerfiles COPY
+    # vendor/claude.agent.core/modules/ledger/ledger.psd1 to /opt/leash/ledger/Ledger.psd1; on the
+    # host it is still at its vendored path. Until 2026-09-24 the second and third entries named
+    # the retired ledger repository's vendor path, a submodule this repository has never had
+    # (forensic seq 24; tests/LedgerPath.Tests.ps1 keeps the name out of every shipped file).
     $snake = @(
         '/opt/leash/ledger/Ledger.psd1'
-        '/opt/leash/vendor/claude.build.ledger/src/ledger/Ledger.psd1'
-        (Join-Path $PSScriptRoot '..' 'vendor' 'claude.build.ledger' 'src' 'ledger' 'Ledger.psd1')
+        (Join-Path $PSScriptRoot '..' 'vendor' 'claude.agent.core' 'modules' 'ledger' 'ledger.psd1')
     ) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
 
     if ($snake) {
         Import-Module $snake -Force -ErrorAction Stop
-        $path = Join-Path (if ($env:LEDGER_DIR) { $env:LEDGER_DIR } else { '/ledger' }) 'ledger.jsonl'
+        # $( ), not ( ): an if statement inside plain parentheses is a runtime error in PowerShell 7
+        # ("The term 'if' is not recognized"), and inside the image this line was reachable.
+        $path = Join-Path $(if ($env:LEDGER_DIR) { $env:LEDGER_DIR } else { '/ledger' }) 'ledger.jsonl'
         if (Test-Path -LiteralPath $path) {
             $v = Get-LedgerVerify -LedgerPath $path
             if ($v -and ($v.PSObject.Properties.Name -contains 'Ok') -and -not $v.Ok) {
