@@ -10,6 +10,106 @@ fails the build rather than being believed.
 
 ---
 
+## 2026-09-23 0c0f714 run-01
+
+The repository is public by decision. The rule that forbade it is retired, not broken.
+
+**Changed:**
+
+- **`AGENTS.md:56` stops being a prohibition and becomes the fact.** "Never make this
+  repo public" held from birth; the repository is public - GitHub API `private: False`
+  - and Jerry has decided it stays that way. The Do-not bullet now states the fact, and
+  says what replaces the rule: nothing enters this tree that a stranger should not read.
+  Core's `docs/plans/2026-09-22-public-release/` is NAMED as the authority on what stays
+  out of a public tree, not copied - this repository does not vendor that plan.
+- **Disagreement table row 8** records the prior rule, the date it stopped holding, and
+  the sequence that is the actual finding: the rule was being broken while `state.ps1`
+  refused to run and therefore could not say so; it became sayable the moment that guard
+  was fixed (seq 12, item 5); it was retired one packet later once someone decided.
+- **`scripts/state.ps1` reports visibility instead of judging it.** The `private:` line
+  stays; the `WARNING: repository is PUBLIC - it must not be` is gone. A report that
+  judges by a retired rule is worse than one that does not judge, because a reader cannot
+  tell which of its warnings still mean anything. The merge-commit warning beside it is
+  untouched - that rule is live.
+- **The promotion of `994adf8` finally has a forensic record**, at seq 17, carrying all
+  three DoD clause measurements as taken at `ac6f167`. PR #7 landed without one.
+- **A PreToolUse hook that refuses heredocs.** `.claude/settings.json` plus
+  `.claude/hooks/Deny-Heredoc.ps1`: a Bash call whose command contains `<<` is denied with
+  "PowerShell only - see AGENTS.md". Exit 0 with a decision body, not exit 2 - the shape
+  `hooks/sentinel.ps1` already had to be repaired into. Fails open on a malformed payload;
+  this guards the hands of an agent trying to comply, not an adversary.
+
+**Tested:** passed=151 failed=0 skipped=2 - in-container, `pwsh 7.6.6`, Pester 6.1.0,
+uid 1001, total 174, `unjustified_skips` empty. Host `Test.Unit`: passed=172 failed=0
+skipped=2 NotRun=0 Inconclusive=0. No test was added or removed: **zero tests asserted
+the repository was private**, measured before the rule was touched, so retiring it
+removed nothing. `requires-header` 39 files checked, 0 missing, with the new hook script
+tracked.
+
+**Failed:** none.
+
+**Missing:**
+
+- **The hook did not arm in the session that wrote it.** Claude Code snapshots hooks at
+  session start and watches only directories that already held a settings file; this
+  repository had no `.claude/` at all. A heredoc pushed through the Bash tool minutes
+  after the file was written ran normally. The script itself was falsified directly -
+  five payloads, five correct verdicts - so this is a timing property, not a broken
+  shape. Open `/hooks` once, or start a new session.
+- **Commit metadata carries a personal email and cannot be fixed.** `git log --all` shows
+  `jerry.infra@gmail.com` as the author of every human commit and the committer of every
+  commit in the repository, and it is now world-readable. No history rewrite - not now,
+  not ever. `git config user.email` in this clone is still that address, so every future
+  commit adds it again; stopping the forward leak is a one-line identity change plus
+  GitHub's keep-my-email-private setting, and both are Jerry's to make.
+- **Branch protection is no longer 403 on this repository.** `docs/plans/BACKLOG.md:45-50`
+  blocks backlog item 04 on a GitHub Pro upgrade, measured 2026-09-21 as 403 "Upgrade to
+  GitHub Pro **or make this repository public**". Re-probed today: `/rulesets` returns
+  `[]` exit 0 and `/branches/main/protection` returns 404 "Branch not protected". The
+  Free-tier limit applies to private repositories only. That also makes the premise at
+  `scripts/ci/Test-PushGuard.ps1:19-25` stale for this repository. Nothing is configured
+  here: turning protection on changes how every merge lands and is Jerry's call.
+- **`claude.agent.core` is itself public**, measured. FINDING-M17 says CI cannot clone the
+  submodule because core is private and needs a PAT passed to `actions/checkout` as
+  `token:`. That premise is dead: a public submodule clones without a secret, so the 43
+  Ledger-tagged tests could run in CI. The M17 PAT was explicitly out of scope for this
+  run, so it is measured and reported rather than acted on. Separately,
+  `.github/workflows/ci.yml:60-80` still names `vendor/claude.build.ledger` and
+  `claude.build.ledger` as the private submodule; the submodule is `vendor/claude.agent.core`.
+  Doubly stale, not edited here.
+- `config/repo.json -> repo` and `schemas/repo.schema.json:3` both still name
+  `claude.pwsh.image.builder`.
+- The README still carries pre-birth wreckage: a `Test.FailFirst` row for a deleted task,
+  a `docker run` example passing `LEDGER_HOOK_ARM=1` that the law forbids, and a
+  `.agents/BREADCRUMBS.md` that never existed in this repository.
+
+**Blockers:**
+
+- **No signing key.** Not touched. Identity is operator-asserted.
+- **Command-hook timeout fails open.** Not touched. 15s PreToolUse, Claude Code semantics.
+- The receipt-append export blocker was struck on 2026-09-23 at seq 9 and is not relisted.
+
+**Ledger head hash:** `e35e9af6c478b126373491953d885f560b5e30fe473167e67a1e97a82d0a0530`
+(receipts at `output/ledger/ledger.jsonl`. It moves on every `Test.InContainer`, so
+`Goal.Update` checks its shape, not its value.)
+
+**Assessment hash:** `798b10ee3ca2d64b28bc779611484ddc0565448c6468ae2ddaf54a53a98030a3`
+- canonical sha256 of `prompts/assessment.2026-09-21.json`, unchanged and re-verified by
+`Bootstrap`.
+
+**Forensic chain:** decision recorded BEFORE any edit at seq 16, `kind=decision`,
+`subject=repo-public-by-decision`, `prev 8ecffe0c`, `self ba6defab`. The overdue promotion
+record follows at seq 17, `kind=verification`,
+`subject=promotion-develop-to-main-994adf8`. `Goal.Update` appends its own, so this run
+adds three records.
+
+**Exposure, measured because the tree is visible.** Live tree: **zero** local paths and
+**zero** email addresses, `git grep` over everything but `vendor/`. The only `C:` strings
+are the placeholder `C:\...` illustrations in comments at `tests/Env.Tests.ps1:25` and
+`tests/TestHelpers.psm1:213`. History patch content, `git log --all -p`: **zero** matches.
+The exposure that does exist is commit metadata, listed under Missing above, and it is not
+fixable without a rewrite this repository will not do.
+
 ## 2026-09-23 531b2e0 run-01
 
 I7: the skip-justification gate becomes a required check, on the host half.
