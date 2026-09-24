@@ -262,7 +262,15 @@ else {
     else {
         Write-Host ("merge commits: {0}   squash: {1}   rebase: {2}   private: {3}" -f $s.m, $s.s, $s.r, $s.p)
         if (-not $s.m) { Write-Host 'WARNING:      merge commits are DISABLED - chained PRs will be flattened' }
-        if (-not $s.p) { Write-Host 'WARNING:      repository is PUBLIC - it must not be' }
+        # NO WARNING ON VISIBILITY. This printed "repository is PUBLIC - it must not be",
+        # sourced from an AGENTS.md rule that was RETIRED on 2026-09-23 when Jerry decided the
+        # repository stays public (disagreement table row 8, forensic chain seq 16). The
+        # `private:` value above stays, because visibility is a fact worth reporting and this
+        # script exists to report facts. What it no longer does is call that fact a violation
+        # of a rule that no longer exists - a report that judges by a retired rule is worse
+        # than one that does not judge, because a reader cannot tell which of its warnings
+        # still mean anything. The merge-commit warning above stays: that rule is live, and
+        # AGENTS.md still requires merges rather than squashes.
     }
 }
 
