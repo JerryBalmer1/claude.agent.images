@@ -42,15 +42,22 @@ verified against `scripts/state.ps1` rather than copied from the prompt.
       01 goes first: .agents/ and the vault are worth nothing until the container is real.
 - [ ] 03 — pretty obsidian skills
       prompt: docs/plans/backlog/03-pretty-obsidian-skills.md
-- [ ] Pro upgrade — GitHub Pro, so rulesets and branch protection exist at all
-      Not a code plan; Jerry's account change. Probed 2026-09-21: all six repos returned
-      403 "Upgrade to GitHub Pro or make this repository public" on /rulesets and on
-      /branches/main/protection. On Free + private there is no branch protection to
-      configure, so 04 cannot be applied or tested. Prove it with the probe in
-      docs/plans/backlog/04-accountability-iac.md before writing a line of rulesets.tf.
+- [x] Pro upgrade — not needed for this repository; the limit was private-only
+      Probed 2026-09-21: all six repos returned 403 "Upgrade to GitHub Pro or make this
+      repository public" on /rulesets and on /branches/main/protection. The message names
+      its own exit: the Free-tier limit applies to PRIVATE repositories only.
+      This repository is public by Jerry's decision (AGENTS.md disagreement row 8).
+      Re-probed 2026-09-23: /rulesets returned [] and /branches/main/protection returned
+      404 "Branch not protected" - available and unset, not forbidden (forensic seq 16).
+      Protection on main is now ON by decision, measured 2026-09-23 (forensic seq 19):
+      PR required, 0 approvals, force-push and deletion off, admins not enforced.
+      Still true for the five private siblings, which is not this backlog's business.
 - [ ] 04 — accountability as code: terraform, rulesets, signing
       prompt: docs/plans/backlog/04-accountability-iac.md
-      Blocked on the Pro upgrade above. Also needs .build.ps1, which 01 delivers.
+      No longer blocked on Pro here: rulesets and branch protection are available, and
+      protection on main already exists by hand, so 04 codifies a live setting rather
+      than inventing one. The other dependency this line used to name, .build.ps1, has
+      been in the tree since the birth commit f1aeb60 - measured 2026-09-23.
 - [ ] archive and tag the operating-protocol plan
       docs/plans/2026-09-20-operating-protocol.md merged in PR #4 and was never archived
       or tagged. That is row 7 of AFTER-CLAUDE-COMMITS.md:

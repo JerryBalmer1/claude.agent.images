@@ -32,7 +32,7 @@ on with the live value. Do not ask the human to reconcile it for you.
 
 | Path | What it is |
 |---|---|
-| `claude.pwsh.image.builder` | **This repo. The only clone.** All git runs here. |
+| `claude.agent.images` | **This repo. The only clone.** All git runs here. |
 | `..` | Parent folder. **NOT a git repo.** `git` here = `fatal: not a git repository`. |
 | `..\claude.build.orchestrator` | A different, nearly empty repo. **The snake does not live there.** |
 | `..\claude.build.{ledger,inspector,fuzzer,policy}` | Sibling projects. Unrelated to this one. Do not vendor them into `src/`. |

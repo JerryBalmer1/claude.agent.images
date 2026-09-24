@@ -2,7 +2,7 @@
 
 <#
 .SYNOPSIS
-    Invoke-Build entry point for the claude.pwsh.image.builder ecosystem.
+    Invoke-Build entry point for claude.agent.images.
 
 .DESCRIPTION
     Builds the agent images (claude.pwsh.image.developer, future .agent) and

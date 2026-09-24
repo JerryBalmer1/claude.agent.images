@@ -1,4 +1,4 @@
-# Git-flow for claude.pwsh.image.builder
+# Git-flow for claude.agent.images
 
 This repo follows a stripped-down git-flow. The leash is a job tool, not a product — the branching model exists so the demo stays reproducible and the experiment results don't get lost in a pile of commits on main.
 

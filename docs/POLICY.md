@@ -6,7 +6,7 @@
   CI check "generated-match-config" fails the build if this file and the config disagree.
 -->
 
-# Policy - JerryBalmer1/claude.pwsh.image.builder
+# Policy - JerryBalmer1/claude.agent.images
 
 Every rule below is rendered from `config/repo.json`. This file is evidence of the
 config, not a second copy of it. If you want to change a rule, change the config.
@@ -49,6 +49,7 @@ waited for. Flipping the mode to `human` and regenerating stops that on the next
 - `branch-flow`
 - `generated-match-config`
 - `pester`
+- `incontainer`
 - `forensic-verify`
 
 One CI job per entry, named exactly the string above. The `generated-match-config` job
