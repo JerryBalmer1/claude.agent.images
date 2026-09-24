@@ -58,15 +58,13 @@ Remove-Module Pester -Force -ErrorAction SilentlyContinue
 Import-Module Pester -RequiredVersion $pinned -Force -ErrorAction Stop
 Write-Host "pester: imported $((Get-Module Pester).Version)"
 
-# Docker-tagged tests are excluded HERE and only here. They need both images built, which is
-# minutes of runner time on every push, and they are not the thing this check is for: this is
-# the fast gate that says the suite is sound. The image is proved by `Invoke-Build
-# Test.InContainer`, which builds it and runs the suite inside it as the non-root user, and
-# whose result is recorded in END_GOAL.md and on the forensic chain for the run.
-#
-# That is a real gap and it is named rather than hidden: a pull request that breaks the
-# Dockerfile goes green here. See docs/plans/2026-09-21-cleanup/FINDINGS.md FINDING-M13.
-$excludeTag = @('Docker')
+# NO TAG IS EXCLUDED. Until 2026-09-24 the Docker tag was, and the 21 Docker-tagged tests were
+# reported NotRun here and tolerated because the filter explained them: they ran on a host with
+# docker and in CI nowhere, so a pull request that broke a Dockerfile went green. Ubuntu runners
+# ship docker, and the Docker-tagged Describe builds both images itself, so this check now runs
+# them (I12 PR 4, forensic seq 36). tests/CiCoverage.Tests.ps1 holds this at @(), and the gate
+# below fails the check on any NotRun at all. A test that cannot run here takes a SkipWhen tag.
+$excludeTag = @()
 
 # The vendored Ledger MUST be present. Without it every Ledger-tagged test fails in a way that
 # reads like a product defect rather than a missing checkout - measured: the sentinel returning
@@ -90,7 +88,7 @@ if (-not (Test-Path -LiteralPath $ledgerManifest)) {
     exit 1
 }
 
-Write-Host "pester: excluding tag(s) [$($excludeTag -join ', ')] -- see FINDING-M13"
+Write-Host 'pester: excluding no tag - every test runs, the Docker-tagged ones included'
 
 $pc = New-PesterConfiguration
 $pc.Run.Path           = $testPath
@@ -102,8 +100,8 @@ $pc.Filter.ExcludeTag  = $excludeTag
 $result = Invoke-Pester -Configuration $pc
 
 Write-Host ''
-Write-Host ("pester: total={0} passed={1} failed={2} skipped={3} duration={4}" -f
-    $result.TotalCount, $result.PassedCount, $result.FailedCount, $result.SkippedCount, $result.Duration)
+Write-Host ("pester: total={0} passed={1} failed={2} skipped={3} notrun={4} duration={5}" -f
+    $result.TotalCount, $result.PassedCount, $result.FailedCount, $result.SkippedCount, $result.NotRunCount, $result.Duration)
 
 if ($result.TotalCount -eq 0) {
     Write-Host 'pester: FAIL -- the suite ran zero tests; an empty suite is not a green'
@@ -118,9 +116,8 @@ if ($result.TotalCount -eq 0) {
 # under Invoke-Build. A required check that passes what the build fails is not a gate.
 #
 # Assert-SuiteClean is the SAME function Test.Unit calls, from build/Build.Helpers.psm1 -
-# not a port of it. The excluded tags are passed in because Pester reports a tag-excluded
-# test as NotRun: on a runner that is the 21 Docker-tagged tests, excluded above by design. A
-# NotRun the filter explains is tolerated; a skip with no reason on the test object is not.
+# not a port of it. No tag is excluded, so every NotRun it sees is unexplained; the explicit
+# gate after it says so by name.
 $helpers = Join-Path $RepoRoot 'build/Build.Helpers.psm1'
 Import-Module $helpers -Force -ErrorAction Stop
 
@@ -133,6 +130,15 @@ catch {
     Write-Host ''
     Write-Host $_.Exception.Message
     Write-Host 'pester: FAIL'
+    exit 1
+}
+# NOTHING SILENT. A NotRun test is one this check neither ran nor skipped with a reason; with no
+# tag excluded there is no legitimate source of one, so any is a failure by name.
+if ($result.NotRunCount -gt 0) {
+    $names = @($result.Tests | Where-Object Result -eq 'NotRun' | ForEach-Object { $_.ExpandedPath })
+    Write-Host ''
+    Write-Host ("pester: FAIL -- {0} test(s) NotRun, and nothing is excluded:" -f $result.NotRunCount)
+    $names | ForEach-Object { Write-Host "  $_" }
     exit 1
 }
 
