@@ -31,6 +31,7 @@ Tick exactly one. Any other pair fails the `branch-flow` check.
 - [ ] `branch-flow`
 - [ ] `generated-match-config`
 - [ ] `pester`
+- [ ] `incontainer`
 - [ ] `forensic-verify`
 
 `review.mode` is `auto`: once every check above is green, the automerge workflow

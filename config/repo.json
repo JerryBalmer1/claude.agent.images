@@ -24,13 +24,15 @@
     "branch-flow",
     "generated-match-config",
     "pester",
+    "incontainer",
     "forensic-verify"
   ],
   "scripts": {
     "requires_version": "7.4"
   },
   "tooling": {
-    "pester": "6.1.0"
+    "pester": "6.1.0",
+    "invokebuild": "5.14.23"
   },
   "trailer": {
     "key": "who",

@@ -49,6 +49,7 @@ waited for. Flipping the mode to `human` and regenerating stops that on the next
 - `branch-flow`
 - `generated-match-config`
 - `pester`
+- `incontainer`
 - `forensic-verify`
 
 One CI job per entry, named exactly the string above. The `generated-match-config` job
