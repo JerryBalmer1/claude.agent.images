@@ -3,6 +3,24 @@
 Decisions that change what this repository keeps, and why. Each one points at the forensic record
 that carries its evidence. Newest first.
 
+## 2026-09-24 - src/LedgerReceipt.ps1 deleted: shipped in both images, called by nothing
+
+**Context.** Both images copy `src/` into `/opt/leash/src/`. `src/LedgerReceipt.ps1` defined
+`Invoke-LedgerBootVerify` and `Test-SentinelChain`, and nothing in the tree dot-sourced it or called
+either function: not `entrypoint.ps1`, not the sentinel, not the build. I11 fixed two defects in it,
+a dead ledger path and an `if` in plain parentheses that threw inside the image. Both were found by
+reading the file, not by anything running it, which is the point. Receipts are written by the
+sentinel through core's `Add-LedgerRecord`. Neither `AGENTS.md` nor `END_GOAL.md` names this file as
+a required receipt writer; that was checked before deleting.
+
+**Decision.** Delete the file and its behavioural test. `tests/ShippedScripts.Tests.ps1` now requires
+every script under `src/` to have a caller outside `tests/`, so the next one is caught when it lands.
+
+**Not changed, and why.** Both Dockerfiles keep `COPY src/ /opt/leash/src/`. There never were
+lines copying this file by name, and `src/` still ships `src/PlanValidator.ps1`, which
+`build/tasks/Plan.build.ps1` calls. Deleting the file removes it from both images through that line.
+Forensic chain seq 40.
+
 ## 2026-09-24 - Public hygiene: forensic records keep what they say
 
 **Context.** The repository is public. I12 PR 1 scanned every tracked file at `e195e49`, including
