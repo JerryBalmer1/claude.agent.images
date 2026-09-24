@@ -10,6 +10,48 @@ fails the build rather than being believed.
 
 ---
 
+## 2026-09-23 d4632d1 run-01
+
+I12, unplanned repair before PR 5, `feature/end-goal-repair`: this file had been corrupted by
+`23b1db9`, and it is rebuilt.
+
+**Changed:**
+
+- `END_GOAL.md` restored. `23b1db9` (I12 PR 1) rewrote 658 older lines - every `a` gone, every backtick
+  turned into `j` - where one line was meant to change. The header and every older section now come
+  from `23b1db9^`, with that one intended line re-applied. The four sections written since are kept
+  as they were.
+- `tests/EndGoalIntegrity.Tests.ps1` checks the required fields in **every** run section, not only
+  the newest, which is all `Goal.Update` reads. It was red before the repair (4 passed, 10 failed).
+
+**Tested:** passed=185 failed=0 skipped=6 - in-container, `pwsh 7.6.6`, Pester 6.1.0, uid 1001,
+wall 33.01s, `unjustified_skips` empty. (184 before this section existed: the integrity test checks each section, this one included.)
+
+**Failed:** none.
+
+**Missing:**
+
+- How `23b1db9` came to carry the damage is not established. The file had changed on disk between the
+  scripted email edit and the next edit. This record says that much and no more.
+- `tests/run.ps1` exits 0 when a test file fails discovery, and a second positional argument binds
+  to `-Evidence`, which force-overwrites that path with a transcript. Both were met during this repair.
+  Both are recorded and not fixed here.
+
+**Blockers:**
+
+- **No signing key.** Not touched. Identity is operator-asserted.
+- **Command-hook timeout fails open.** Not touched. 15s PreToolUse, Claude Code semantics.
+- The receipt-append export blocker was struck on 2026-09-23 at seq 9 and is not relisted.
+
+**Ledger head hash:** `33a77e42c7a9f230735561fdbcd3abe28df294abb4d92671b0bffde536bd123a`
+(shape checked, not value.)
+
+**Assessment hash:** `798b10ee3ca2d64b28bc779611484ddc0565448c6468ae2ddaf54a53a98030a3`
+- canonical sha256 of `prompts/assessment.2026-09-21.json`, unchanged and re-verified by `Bootstrap`.
+
+**Forensic chain:** confession at seq 38 (`end-goal-corrupted-by-23b1db9`). `Goal.Update` appends its
+own `verification` record.
+
 ## 2026-09-23 c7b2dee run-01
 
 I12 PR 4, `feature/docker-tests-in-ci`: the 21 Docker-tagged tests run in CI, and the in-container
