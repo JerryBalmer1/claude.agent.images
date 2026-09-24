@@ -20,10 +20,12 @@ BeforeAll {
     $script:RepoRoot = Get-RepoRoot
 }
 
-Describe 'No shipped file points at claude.build.ledger' {
+# Titles say 'the retired ledger repository' rather than its name: the I11 postcondition is that no
+# log line of the in-container run carries the old path, and Pester prints every title.
+Describe 'No shipped file points at the retired ledger repository' {
     # The five places the packet names. images/developer/Dockerfile is the developer image's
     # Dockerfile and copies the same module, so it is swept too.
-    It 'finds claude.build.ledger in no tracked file under src/, hooks/, scripts/, entrypoint.ps1 or a Dockerfile' {
+    It 'finds the retired ledger repository''s name in no tracked file under src/, hooks/, scripts/, entrypoint.ps1 or a Dockerfile' {
         Push-Location $script:RepoRoot
         try {
             $files = @(git ls-files -- 'src/' 'hooks/' 'scripts/' 'entrypoint.ps1' 'Dockerfile' 'images/developer/Dockerfile')
