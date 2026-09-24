@@ -1,13 +1,14 @@
 #Requires -Version 7.4
 #
 # COPIED, NOT VENDORED.
-#   origin repo   : claude.agent.substrate
+#   origin repo   : a private sibling repository (not public)
 #   origin file   : scripts/ci/Test-GeneratedMatchesConfig.ps1
 #   origin commit : 912c1c9eb48ab0b639d257bc7b10661d7212f985
 #   origin sha256 : add2dd1bf604a7a14c18bae027413fb76ba9f37951161ce0eb160d123cf7ed42
-#   adapted here  : no - byte-identical at copy time
+#   adapted here  : comments only - byte-identical at copy time; the origin repository's name was
+#                   removed from these comments on 2026-09-24 (public hygiene, I12)
 #
-# There is no submodule here and substrate does not follow this copy. If substrate's
+# There is no submodule here and the origin does not follow this copy. If the origin's
 # version moves, this one does not move with it. Diff the two against the origin commit
 # above before assuming they still agree.
 #

@@ -2,6 +2,8 @@
 
 Born from claude.pwsh.image.builder at 5f711736e028f0078d8b32b732ec37cb224258be; depends on claude.agent.core v0.2.0 (536cb2cdf5a56780fbb2a3066e3d724d4d06565e).
 
+Licensed under the MIT License; see [LICENSE](LICENSE).
+
 **The leash, rebuilt.** A Docker image that runs Claude Code with a PreToolUse deny gate, hash-chained receipts, and the policy outside the agent's reach — now with an Invoke-Build surface that enforces the shared plan contract.
 
 ## What this is

@@ -1,13 +1,14 @@
 #Requires -Version 7.4
 #
 # COPIED, NOT VENDORED.
-#   origin repo   : claude.agent.substrate
+#   origin repo   : a private sibling repository (not public)
 #   origin file   : scripts/Invoke-AutoMerge.ps1
 #   origin commit : 912c1c9eb48ab0b639d257bc7b10661d7212f985
 #   origin sha256 : b3c9716326dd26d433f56e7c09d26a3b4afdd4ae4a5b2fbecf81165dd054beb8
-#   adapted here  : no - byte-identical at copy time
+#   adapted here  : comments only - byte-identical at copy time; the origin repository's name was
+#                   removed from these comments on 2026-09-24 (public hygiene, I12)
 #
-# There is no submodule here and substrate does not follow this copy. If substrate's
+# There is no submodule here and the origin does not follow this copy. If the origin's
 # version moves, this one does not move with it. Diff the two against the origin commit
 # above before assuming they still agree.
 #
@@ -59,7 +60,7 @@
     Get-ReviewConfigRef to the head turns it red without a pull request being opened.
 
 .EXAMPLE
-    ./scripts/Invoke-AutoMerge.ps1 -Repo JerryBalmer1/claude.agent.substrate -PullRequest 1
+    ./scripts/Invoke-AutoMerge.ps1 -Repo JerryBalmer1/claude.agent.images -PullRequest 1
 #>
 [CmdletBinding()]
 param(
