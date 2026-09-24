@@ -37,14 +37,56 @@ BeforeAll {
             [AllowEmptyString()][AllowNull()][string]$Stdin,
             [string]$Mode = 'Enforce',
             [string]$LedgerPath,
-            [string]$Principal = 'run-01-test'
+            [string]$Principal = 'run-01-test',
+            [string]$ConfigPath
         )
         return Invoke-LeashScript -Path $script:Sentinel -Arguments @('-Mode', $Mode) -Stdin $Stdin -Environment @{
-            LEASH_LEDGER_PATH   = $LedgerPath
-            LEASH_LEDGER_MODULE = $script:LedgerModule
-            LEDGER_PRINCIPAL    = $Principal
-            LEASH_MODE          = $Mode
+            LEASH_LEDGER_PATH     = $LedgerPath
+            LEASH_LEDGER_MODULE   = $script:LedgerModule
+            LEDGER_PRINCIPAL      = $Principal
+            LEASH_MODE            = $Mode
+            LEASH_SENTINEL_CONFIG = $(if ($ConfigPath) { $ConfigPath } else { $null })
         }
+    }
+
+    # A sentinel config in a sandbox, with its own policy script. The body is the policy: it gets
+    # -Tool and -GatedTool and must return the string 'allow' or 'deny'. Anything else it does -
+    # sleep, throw, return nonsense - is what the fail-closed tests are about.
+    function script:New-SentinelConfig {
+        param(
+            [Parameter(Mandatory)][string]$Root,
+            [int]$TimeoutMs = 5000,
+            [string]$FailMode = 'closed',
+            [string]$PolicyBody = 'param($Tool, [string[]]$GatedTool) if ($GatedTool -contains $Tool) { ''deny'' } else { ''allow'' }',
+            [string]$RawConfig
+        )
+        $policy = Join-Path $Root 'policy.ps1'
+        [System.IO.File]::WriteAllText($policy, $PolicyBody)
+        $config = Join-Path $Root 'sentinel.json'
+        $text = if ($PSBoundParameters.ContainsKey('RawConfig')) { $RawConfig } else {
+            [ordered]@{ schema = 'claude.agent.sentinel/1'; timeout_ms = $TimeoutMs; fail_mode = $FailMode; policy = $policy } |
+                ConvertTo-Json -Compress
+        }
+        [System.IO.File]::WriteAllText($config, $text)
+        return $config
+    }
+
+    function script:Get-LastReceipt {
+        param([Parameter(Mandatory)][string]$LedgerPath)
+        return (@(Get-Content -LiteralPath $LedgerPath)[-1] | ConvertFrom-Json)
+    }
+
+    # The one shape every non-allow path must have: exit 0, exactly a deny body, and a receipt
+    # whose model names the reason. stdout JSON is honoured only on exit 0.
+    function script:Assert-ReceiptedDeny {
+        param([Parameter(Mandatory)]$Result, [Parameter(Mandatory)][string]$LedgerPath, [Parameter(Mandatory)][string]$Reason)
+        $Result.ExitCode | Should -Be 0 -Because "a receipted deny is a body on exit 0; stderr: $($Result.StdErr)"
+        $body = ConvertFrom-JsonSafe -Text $Result.StdOut
+        @($body.PSObject.Properties.Name) | Should -Be @('hookSpecificOutput')
+        $body.hookSpecificOutput.permissionDecision | Should -BeExactly 'deny'
+        $body.hookSpecificOutput.permissionDecisionReason | Should -Match "reason=$([regex]::Escape($Reason))"
+        $LedgerPath | Should -Exist -Because 'the deny is receipted before the sentinel exits'
+        (Get-LastReceipt -LedgerPath $LedgerPath).model | Should -BeLike "*/deny:$Reason"
     }
 }
 
@@ -192,18 +234,71 @@ Describe 'Sentinel: fails closed' -Tag 'Ledger' {
     BeforeEach { $script:Box = New-LeashSandbox }
     AfterEach { Remove-LeashSandbox -Root $script:Box.Root }
 
-    It 'exits 2 with empty stdout on <Name>' -ForEach @(
-        @{ Name = 'malformed stdin'; Stdin = 'not json at all {{{' }
-        @{ Name = 'empty stdin'; Stdin = '' }
-        @{ Name = 'valid JSON with no tool_name'; Stdin = '{"session_id":"x"}' }
-        @{ Name = 'a JSON array instead of an object'; Stdin = '[{"tool_name":"Bash"}]' }
-        @{ Name = 'a bare JSON string'; Stdin = '"Bash"' }
+    # Every path that is not an explicit allow verdict is a deny, receipted before exit. Until
+    # I14 PR 4 these were exit 2 with no receipt: blocked, but with nothing on the chain to say a
+    # call was ever refused.
+    It 'denies and receipts <Name> as reason=<Reason>' -ForEach @(
+        @{ Name = 'malformed stdin'; Stdin = 'not json at all {{{'; Reason = 'malformed-payload' }
+        @{ Name = 'empty stdin'; Stdin = ''; Reason = 'malformed-payload' }
+        @{ Name = 'valid JSON with no tool_name'; Stdin = '{"session_id":"x"}'; Reason = 'malformed-payload' }
+        @{ Name = 'a JSON array instead of an object'; Stdin = '[{"tool_name":"Bash"}]'; Reason = 'malformed-payload' }
+        @{ Name = 'a bare JSON string'; Stdin = '"Bash"'; Reason = 'malformed-payload' }
     ) {
         $r = Invoke-Sentinel -Stdin $Stdin -LedgerPath $script:Box.LedgerPath
+        Assert-ReceiptedDeny -Result $r -LedgerPath $script:Box.LedgerPath -Reason $Reason
+        (Get-LastReceipt -LedgerPath $script:Box.LedgerPath).model | Should -BeExactly "run-01-test/-/deny:$Reason"
+    }
 
-        $r.ExitCode | Should -Be 2 -Because 'exit 2 blocks the call and feeds stderr back to Claude'
-        $r.StdOut | Should -BeExactly '' -Because 'a body on a failure path would be discarded anyway, and hides the error'
-        $r.StdErr | Should -Match 'leash-sentinel:'
+    It 'THE FALSIFIER: a policy step stalled past the timeout is blocked, and receipted as reason=timeout' {
+        # The policy sleeps 30s against a 1s budget. Blocked means a deny on stdout, and it has to
+        # arrive long before the sleep ends: the host's own hook timeout fails OPEN, so a sentinel
+        # that merely waits is a sentinel that allows.
+        $config = New-SentinelConfig -Root $script:Box.Root -TimeoutMs 1000 -PolicyBody 'param($Tool, $GatedTool) Start-Sleep -Seconds 30; ''allow'''
+        $clock = [System.Diagnostics.Stopwatch]::StartNew()
+        $r = Invoke-Sentinel -Stdin (New-Payload -Tool 'Read') -LedgerPath $script:Box.LedgerPath -ConfigPath $config
+        $clock.Stop()
+        Assert-ReceiptedDeny -Result $r -LedgerPath $script:Box.LedgerPath -Reason 'timeout'
+        $clock.Elapsed.TotalSeconds | Should -BeLessThan 15 -Because 'the managed-settings hook timeout is 15s and it fails open'
+    }
+
+    It 'a timeout denies in Observe mode too: Observe relaxes the policy, not the failure' {
+        $config = New-SentinelConfig -Root $script:Box.Root -TimeoutMs 1000 -PolicyBody 'param($Tool, $GatedTool) Start-Sleep -Seconds 30; ''allow'''
+        $r = Invoke-Sentinel -Stdin (New-Payload -Tool 'Read') -Mode 'Observe' -LedgerPath $script:Box.LedgerPath -ConfigPath $config
+        Assert-ReceiptedDeny -Result $r -LedgerPath $script:Box.LedgerPath -Reason 'timeout'
+    }
+
+    It 'denies and receipts a policy that throws as reason=policy-crash' {
+        $config = New-SentinelConfig -Root $script:Box.Root -PolicyBody 'param($Tool, $GatedTool) throw ''policy blew up'''
+        $r = Invoke-Sentinel -Stdin (New-Payload -Tool 'Read') -LedgerPath $script:Box.LedgerPath -ConfigPath $config
+        Assert-ReceiptedDeny -Result $r -LedgerPath $script:Box.LedgerPath -Reason 'policy-crash'
+    }
+
+    It 'denies and receipts a verdict that is not exactly allow or deny as reason=malformed-verdict (<Verdict>)' -ForEach @(
+        @{ Verdict = 'maybe' }, @{ Verdict = 'Allow' }, @{ Verdict = '' }
+    ) {
+        $config = New-SentinelConfig -Root $script:Box.Root -PolicyBody "param(`$Tool, `$GatedTool) '$Verdict'"
+        $r = Invoke-Sentinel -Stdin (New-Payload -Tool 'Read') -LedgerPath $script:Box.LedgerPath -ConfigPath $config
+        Assert-ReceiptedDeny -Result $r -LedgerPath $script:Box.LedgerPath -Reason 'malformed-verdict'
+    }
+
+    It 'denies and receipts a malformed policy config as reason=malformed-policy (<Name>)' -ForEach @(
+        @{ Name = 'not JSON';            Raw = 'this is not { json' }
+        @{ Name = 'fail_mode open';      Raw = '{"schema":"claude.agent.sentinel/1","timeout_ms":5000,"fail_mode":"open","policy":"policy.ps1"}' }
+        @{ Name = 'no timeout_ms';       Raw = '{"schema":"claude.agent.sentinel/1","fail_mode":"closed","policy":"policy.ps1"}' }
+        @{ Name = 'timeout_ms too long'; Raw = '{"schema":"claude.agent.sentinel/1","timeout_ms":60000,"fail_mode":"closed","policy":"policy.ps1"}' }
+        @{ Name = 'no policy script';    Raw = '{"schema":"claude.agent.sentinel/1","timeout_ms":5000,"fail_mode":"closed","policy":"no-such-policy.ps1"}' }
+    ) {
+        $config = New-SentinelConfig -Root $script:Box.Root -RawConfig $Raw
+        $r = Invoke-Sentinel -Stdin (New-Payload -Tool 'Read') -LedgerPath $script:Box.LedgerPath -ConfigPath $config
+        Assert-ReceiptedDeny -Result $r -LedgerPath $script:Box.LedgerPath -Reason 'malformed-policy'
+    }
+
+    It 'an explicit allow verdict is the one path that allows' {
+        $config = New-SentinelConfig -Root $script:Box.Root
+        $r = Invoke-Sentinel -Stdin (New-Payload -Tool 'Read') -LedgerPath $script:Box.LedgerPath -ConfigPath $config
+        $r.ExitCode | Should -Be 0
+        $r.StdOut | Should -BeExactly '{}'
+        (Get-LastReceipt -LedgerPath $script:Box.LedgerPath).model | Should -BeExactly 'run-01-test/Read/allow'
     }
 
     It 'exits 2 when the ledger directory is not mounted' {
@@ -228,9 +323,13 @@ Describe 'Sentinel: fails closed' -Tag 'Ledger' {
         $r.StdErr | Should -Match 'ledger write failed'
     }
 
-    It 'writes no receipt when it fails closed' {
-        $null = Invoke-Sentinel -Stdin 'not json' -LedgerPath $script:Box.LedgerPath
-        $script:Box.LedgerPath | Should -Not -Exist -Because 'a payload it could not parse is not a decision it made'
+    It 'a ledger that cannot be written still denies: exit 2, stderr, nothing on stdout' {
+        # The one deny that cannot be receipted, because the receipt is what failed. Exit 2 blocks
+        # the call and hands stderr to Claude; there is nowhere else to say it.
+        $r = Invoke-Sentinel -Stdin 'not json' -LedgerPath (Join-Path $script:Box.Root 'no-such-mount' 'ledger.jsonl')
+        $r.ExitCode | Should -Be 2
+        $r.StdOut | Should -BeExactly ''
+        $r.StdErr | Should -Match 'leash-sentinel: .*reason=malformed-payload'
     }
 }
 
