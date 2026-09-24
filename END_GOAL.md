@@ -10,6 +10,48 @@ fails the build rather than being believed.
 
 ---
 
+## 2026-09-23 6ab3298 run-01
+
+I12 PR 5, `feature/ledger-receipt-caller`: `src/LedgerReceipt.ps1` is deleted. It shipped in both
+images and nothing called it.
+
+**Changed:**
+
+- `src/LedgerReceipt.ps1` and its behavioural test deleted. `AGENTS.md` and `END_GOAL.md` were checked
+  first: neither names it as a required receipt writer. The file sweep in `tests/LedgerPath.Tests.ps1`
+  stays.
+- `tests/ShippedScripts.Tests.ps1`: every script under `src/` needs a caller outside `tests/`. It was red
+  before the deletion, on this file alone.
+- Dockerfiles unchanged. No line copied this file by name; `COPY src/` stays because
+  `src/PlanValidator.ps1` ships through it. Measured after the build: `/opt/leash/src/` holds only
+  `PlanValidator.ps1` in both images.
+- `DECISIONS.md` entry.
+
+**Tested:** passed=187 failed=0 skipped=6 - in-container, `pwsh 7.6.6`, Pester 6.1.0, uid 1001,
+wall 34.01s, `unjustified_skips` empty. Both images built.
+
+**Failed:** none.
+
+**Missing:**
+
+- `tests/run.ps1` still exits 0 on a discovery failure and still binds a second positional argument to
+  `-Evidence` (recorded in the repair section below; not in I12's scope).
+
+**Blockers:**
+
+- **No signing key.** Not touched. Identity is operator-asserted.
+- **Command-hook timeout fails open.** Not touched. 15s PreToolUse, Claude Code semantics.
+- The receipt-append export blocker was struck on 2026-09-23 at seq 9 and is not relisted.
+
+**Ledger head hash:** `33a77e42c7a9f230735561fdbcd3abe28df294abb4d92671b0bffde536bd123a`
+(shape checked, not value.)
+
+**Assessment hash:** `798b10ee3ca2d64b28bc779611484ddc0565448c6468ae2ddaf54a53a98030a3`
+- canonical sha256 of `prompts/assessment.2026-09-21.json`, unchanged and re-verified by `Bootstrap`.
+
+**Forensic chain:** decision before any edit at seq 40 (`ledger-receipt-deleted`), naming the one false
+premise. `Goal.Update` appends its own `verification` record.
+
 ## 2026-09-23 d4632d1 run-01
 
 I12, unplanned repair before PR 5, `feature/end-goal-repair`: this file had been corrupted by
