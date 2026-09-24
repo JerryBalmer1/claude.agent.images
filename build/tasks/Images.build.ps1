@@ -26,7 +26,7 @@ task Build.Image.Leash {
     $root = $Build.RepositoryRoot
     $file = Join-Path $root 'Dockerfile'
     Write-Build Cyan "Building $($Build.LeashTag) ..."
-    $r = Invoke-ImageBuild -ContextRoot $root -Dockerfile $file -Tag $Build.LeashTag
+    $r = Invoke-ImageBuild -ContextRoot $root -Dockerfile $file -Tag $Build.LeashTag -NoCache:$Build.NoCache
     if ($r.ExitCode -ne 0) { throw "docker build failed for $($Build.LeashTag), exit $($r.ExitCode)" }
     Write-Build Green "Built $($Build.LeashTag)"
 }
@@ -39,7 +39,7 @@ task Build.Image.Developer {
         throw "Developer Dockerfile missing: $file"
     }
     Write-Build Cyan "Building $($Build.DeveloperTag) ..."
-    $r = Invoke-ImageBuild -ContextRoot $root -Dockerfile $file -Tag $Build.DeveloperTag
+    $r = Invoke-ImageBuild -ContextRoot $root -Dockerfile $file -Tag $Build.DeveloperTag -NoCache:$Build.NoCache
     if ($r.ExitCode -ne 0) { throw "docker build failed for $($Build.DeveloperTag), exit $($r.ExitCode)" }
     Write-Build Green "Built $($Build.DeveloperTag)"
 }

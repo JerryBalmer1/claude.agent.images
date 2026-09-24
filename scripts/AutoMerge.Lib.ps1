@@ -5,7 +5,8 @@
 #   origin file   : scripts/AutoMerge.Lib.ps1
 #   origin commit : 912c1c9eb48ab0b639d257bc7b10661d7212f985
 #   origin sha256 : 0e3564d420aa5a53975ba0db047108e1ef173381209cc63dbb91312aebb9ce6d
-#   adapted here  : YES - 2026-09-24 (I12): Invoke-CiDispatchOnMain added; earlier, the origin's name was
+#   adapted here  : YES - 2026-09-24 (I12): Invoke-CiDispatchOnMain added, and later its gh call's output
+#                   discarded (I13-F2); earlier, the origin's name was
 #                   removed from these comments on 2026-09-24 (public hygiene, I12)
 #
 # There is no submodule here and the origin does not follow this copy. If the origin's
@@ -223,6 +224,8 @@ function Invoke-CiDispatchOnMain {
         return [pscustomobject]@{ Dispatched = $false; Ref = $BaseRef }
     }
 
-    gh workflow run ci.yml --repo $Repo --ref $main
+    # $null = : real gh prints the created run's URL, and without this it joins the output and the
+    # caller gets Object[] instead of one object (FINDINGS.md I13-F2, automerge run 35964076759).
+    $null = gh workflow run ci.yml --repo $Repo --ref $main
     return [pscustomobject]@{ Dispatched = $true; Ref = $main }
 }

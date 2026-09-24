@@ -67,6 +67,25 @@ Describe 'Automerge dispatches ci on main after a promotion' {
         @($script:Calls) | Should -Be @('workflow run ci.yml --repo o/n --ref main')
     }
 
+    # FINDINGS.md I13-F2. Real gh prints the created run's URL. The silent stub above could not see
+    # that line join the function's output and turn the result into Object[], which made
+    # $dispatch.Dispatched throw under strict mode in automerge run 35964076759.
+    It 'returns one clean object when gh workflow run prints a line' {
+        function script:gh { $script:Calls.Add(($args -join ' ')); $global:LASTEXITCODE = 0; 'https://github.com/o/n/actions/runs/1' }
+        try {
+            $script:Calls.Clear()
+            $r = Invoke-CiDispatchOnMain -Repo 'o/n' -BaseRef 'main' -Config $script:Config
+            @($r).Count | Should -Be 1
+            $r | Should -BeOfType [pscustomobject]
+            $r.Dispatched | Should -BeTrue
+            $r.Ref | Should -BeExactly 'main'
+            @($script:Calls) | Should -Be @('workflow run ci.yml --repo o/n --ref main')
+        }
+        finally {
+            function script:gh { $script:Calls.Add(($args -join ' ')); $global:LASTEXITCODE = 0 }
+        }
+    }
+
     It 'dispatches nothing for a merge into develop' {
         $script:Calls.Clear()
         $r = Invoke-CiDispatchOnMain -Repo 'o/n' -BaseRef 'develop' -Config $script:Config
