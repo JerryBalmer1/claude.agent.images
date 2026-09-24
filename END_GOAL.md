@@ -10,6 +10,49 @@ f ils the build r ther th n being believed.
 
 ---
 
+## 2026-09-23 f470895 run-01
+
+I12 PR 3, `feature/ci-on-main`: after a merge into main, automerge dispatches `ci.yml` on main.
+
+**Changed:**
+
+- `Invoke-CiDispatchOnMain` in `scripts/AutoMerge.Lib.ps1`, called by `Invoke-AutoMerge.ps1` after the
+  merge. `automerge.yml` gets `actions: write`. `ci.yml` gets `workflow_dispatch` and `actions: read`.
+- `AGENTS.md` claim: the commit at main's tip has a completed, successful ci run.
+- `tests/CiOnMain.Tests.ps1`: the dispatch decision with `gh` shadowed, the checker on fixed commits
+  (`6b8943a` has 0 ci runs, measured, kept as the red case; `74c1db2` has one), and the live claim.
+  Red before the fix: 4 failed.
+
+**Tested:** passed=165 failed=0 skipped=6 - in-container, `pwsh 7.6.6`, Pester 6.1.0, uid 1001,
+`unjustified_skips` empty. The three new skips are `no-gh-cli`.
+
+**Failed:** none.
+
+**Missing:**
+
+- **The live claim cannot run yet.** Automerge's `workflow_run` runs `main`'s copy of itself, so the
+  promotion that brings the dispatch to `main` is merged by the pre-dispatch copy. The packet's
+  "confirm PR 3's dispatch produced a ci run on the new main tip" rests on a false premise for that
+  promotion. The first automerge dispatch comes one promotion later.
+- Automerged merges into `develop` get no push CI either. Their trees are the checked pull request
+  heads. This is recorded at seq 34 and not changed.
+- The Docker-tagged tests still run nowhere in CI (I12 PR 4).
+
+**Blockers:**
+
+- **No signing key.** Not touched. Identity is operator-asserted.
+- **Command-hook timeout fails open.** Not touched. 15s PreToolUse, Claude Code semantics.
+- The receipt-append export blocker was struck on 2026-09-23 at seq 9 and is not relisted.
+
+**Ledger head hash:** `33a77e42c7a9f230735561fdbcd3abe28df294abb4d92671b0bffde536bd123a`
+(shape checked, not value.)
+
+**Assessment hash:** `798b10ee3ca2d64b28bc779611484ddc0565448c6468ae2ddaf54a53a98030a3`
+- canonical sha256 of `prompts/assessment.2026-09-21.json`, unchanged and re-verified by `Bootstrap`.
+
+**Forensic chain:** decision before any edit at seq 34 (`ci-on-main`), naming the false premise.
+`Goal.Update` appends its own `verification` record.
+
 ## 2026-09-23 24e8812 run-01
 
 I12 PR 2, `feature/merge-settings`: the repository enforces merge commits only, and a test reads that live.
