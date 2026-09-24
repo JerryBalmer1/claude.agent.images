@@ -23,6 +23,7 @@
     "trailer-guard",
     "branch-flow",
     "generated-match-config",
+    "images",
     "pester",
     "incontainer",
     "forensic-verify"

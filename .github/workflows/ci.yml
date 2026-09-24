@@ -62,8 +62,39 @@ jobs:
       - shell: pwsh
         run: ./scripts/ci/Test-GeneratedMatchesConfig.ps1
 
+  # Both images, built ONCE per run and only on a cache miss. The key is sha256 over everything
+  # the two builds read (each Dockerfile, .dockerignore, every file a COPY line names), so the
+  # same inputs on any commit hit. `pester` and `incontainer` need this job and load its images;
+  # their builds then find the label for these inputs and build nothing, so on a hit no job in
+  # the run reaches archive.ubuntu.com. Until I13 PR 3 both of them built both images, and one
+  # run failed on DNS for that mirror. The cache is actions/cache: no registry, no secret.
+  images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - id: key
+        shell: pwsh
+        run: ./scripts/ci/Invoke-ImageCache.ps1 -Step Key
+      - id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: output/image-cache
+          key: ${{ steps.key.outputs.key }}
+          lookup-only: true
+      - if: steps.cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: ./scripts/ci/Invoke-ImageCache.ps1 -Step Build
+      - if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: output/image-cache
+          key: ${{ steps.key.outputs.key }}
+
   pester:
     runs-on: ubuntu-latest
+    needs: images
     steps:
       # `submodules: recursive` fetches vendor/claude.agent.core, which carries the Ledger module
       # the sentinel writes receipts through. core is PUBLIC, so the workflow GITHUB_TOKEN clones
@@ -85,6 +116,17 @@ jobs:
       # GH_TOKEN is the workflow's own GITHUB_TOKEN - no PAT, no secret added. tests/MergeSettings.Tests.ps1
       # reads the repository's merge settings through gh api graphql with it; without it gh has
       # no credential and that test fails rather than passing on silence.
+      #
+      # The images job's saved images, loaded before the Docker-tagged tests build them.
+      - id: key
+        shell: pwsh
+        run: ./scripts/ci/Invoke-ImageCache.ps1 -Step Key
+      - uses: actions/cache/restore@v4
+        with:
+          path: output/image-cache
+          key: ${{ steps.key.outputs.key }}
+      - shell: pwsh
+        run: ./scripts/ci/Invoke-ImageCache.ps1 -Step Load
       - shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -92,6 +134,7 @@ jobs:
 
   incontainer:
     runs-on: ubuntu-latest
+    needs: images
     steps:
       # The suite where the artefact is: both images built on the runner, then Invoke-Build
       # Test.InContainer - the task a promotion measures as clause (b) - runs it inside the leash
@@ -105,6 +148,16 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
+      # The images job's saved images, loaded before Build.Image looks for them.
+      - id: key
+        shell: pwsh
+        run: ./scripts/ci/Invoke-ImageCache.ps1 -Step Key
+      - uses: actions/cache/restore@v4
+        with:
+          path: output/image-cache
+          key: ${{ steps.key.outputs.key }}
+      - shell: pwsh
+        run: ./scripts/ci/Invoke-ImageCache.ps1 -Step Load
       - shell: pwsh
         run: ./scripts/ci/Invoke-InContainer.ps1
       - uses: actions/upload-artifact@v4
