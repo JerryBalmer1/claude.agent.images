@@ -1,13 +1,13 @@
 #Requires -Version 7.4
 #
 # COPIED, NOT VENDORED.
-#   origin repo   : claude.agent.substrate
+#   origin repo   : a private sibling repository (not public)
 #   origin file   : scripts/ci/Test-Trailers.ps1
 #   origin commit : 912c1c9eb48ab0b639d257bc7b10661d7212f985
 #   origin sha256 : 3f9cab8876aa55ebb6f5585dc8c6b27cab0b382a4897642754e36e5ee6dca2ec
 #   adapted here  : YES - adapted for this repo, diff before assuming they agree
 #
-# There is no submodule here and substrate does not follow this copy. If substrate's
+# There is no submodule here and the origin does not follow this copy. If the origin's
 # version moves, this one does not move with it. Diff the two against the origin commit
 # above before assuming they still agree.
 #
@@ -86,7 +86,7 @@ $key      = $config.trailer.key
 $allowed  = @($config.trailer.allowed)
 
 if ([string]::IsNullOrWhiteSpace($GrandfatherPath)) {
-    # .continuity/, not config/, as in claude.agent.substrate. The exemption list belongs beside
+    # .continuity/, not config/, as in the private origin repository. The exemption list belongs beside
     # forensic.jsonl here: it exists because several of the hashes it names are cited by that
     # chain and therefore cannot be rewritten. config/ in this repository is build configuration.
     $GrandfatherPath = Join-Path $RepoRoot '.continuity/trailer-grandfather.txt'
@@ -147,7 +147,7 @@ try {
         $body = (& git log -1 --format='%B' $sha | Out-String)
 
         # NO Co-Authored-By. AGENTS.md forbids it and the `who:` trailer is what replaces it.
-        # This guard existed on the develop lineage as its own CI step; porting substrate's CI
+        # This guard existed on the develop lineage as its own CI step; porting the origin's CI
         # wholesale would have dropped it, so it is folded in here rather than lost. It is a
         # trailer rule, it belongs in the trailer check, and it needs no seventh required check.
         #

@@ -1,7 +1,7 @@
 #Requires -Version 7.4
 #
 # COPIED, NOT VENDORED.
-#   origin repo   : claude.agent.substrate
+#   origin repo   : a private sibling repository (not public)
 #   origin file   : scripts/ci/Test-PushGuard.ps1
 #   origin commit : 912c1c9eb48ab0b639d257bc7b10661d7212f985
 #   origin sha256 : 7847e71292e63d1c4753adca8369245dfde42e5c8a20320b85b917c0855076d3
@@ -10,7 +10,7 @@
 #                   config/; and the branch-protection premise is rewritten for a public
 #                   repository. No behaviour differs. Byte-identical otherwise.
 #
-# There is no submodule here and substrate does not follow this copy. If substrate's
+# There is no submodule here and the origin does not follow this copy. If the origin's
 # version moves, this one does not move with it. Diff the two against the origin commit
 # above before assuming they still agree.
 #

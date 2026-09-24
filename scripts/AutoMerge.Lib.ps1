@@ -1,13 +1,14 @@
 #Requires -Version 7.4
 #
 # COPIED, NOT VENDORED.
-#   origin repo   : claude.agent.substrate
+#   origin repo   : a private sibling repository (not public)
 #   origin file   : scripts/AutoMerge.Lib.ps1
 #   origin commit : 912c1c9eb48ab0b639d257bc7b10661d7212f985
 #   origin sha256 : 0e3564d420aa5a53975ba0db047108e1ef173381209cc63dbb91312aebb9ce6d
-#   adapted here  : no - byte-identical at copy time
+#   adapted here  : comments only - byte-identical at copy time; the origin repository's name was
+#                   removed from these comments on 2026-09-24 (public hygiene, I12)
 #
-# There is no submodule here and substrate does not follow this copy. If substrate's
+# There is no submodule here and the origin does not follow this copy. If the origin's
 # version moves, this one does not move with it. Diff the two against the origin commit
 # above before assuming they still agree.
 #
@@ -81,7 +82,7 @@ function Get-RepoConfigAtRef {
     # only shows up under test: $LASTEXITCODE is set by NATIVE commands, and a test that shadows
     # `gh` with a FUNCTION never touches it, so the variable keeps whatever stale value it had -
     # frequently $null - and the guard then rejects perfectly good configs. Caught in
-    # claude.agent.substrate, where three passing tests went red the moment it landed. In
+    # the private origin repository, where three passing tests went red the moment it landed. In
     # production it is worse than useless: silently correct until some earlier native call
     # leaves a non-zero behind.
     #

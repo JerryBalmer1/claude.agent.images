@@ -1,13 +1,14 @@
 #Requires -Version 7.4
 #
 # COPIED, NOT VENDORED.
-#   origin repo   : claude.agent.substrate
+#   origin repo   : a private sibling repository (not public)
 #   origin file   : scripts/ci/Test-BranchFlow.ps1
 #   origin commit : 912c1c9eb48ab0b639d257bc7b10661d7212f985
 #   origin sha256 : d8aee82fb7a25748864b9c08b9e9ce5afb685bea3671d527b6ef5e1b560f0275
-#   adapted here  : no - byte-identical at copy time
+#   adapted here  : comments only - byte-identical at copy time; the origin repository's name was
+#                   removed from these comments on 2026-09-24 (public hygiene, I12)
 #
-# There is no submodule here and substrate does not follow this copy. If substrate's
+# There is no submodule here and the origin does not follow this copy. If the origin's
 # version moves, this one does not move with it. Diff the two against the origin commit
 # above before assuming they still agree.
 #
