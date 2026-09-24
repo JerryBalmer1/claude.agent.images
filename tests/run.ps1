@@ -18,15 +18,36 @@
 
     A later plan extends this runner. Keep the contract: -Path narrows the run,
     -Evidence tees the transcript to a file, exit code is 0 green / 1 red.
+
+    Red includes a test file that fails to LOAD. Pester counts that as a failed container and
+    leaves it out of every test count; until 2026-09-24 this runner read only FailedCount and
+    exited 0 on it. The file and its error are printed, and the summary counts it as not run.
+
+    -Evidence is NAMED ONLY, and any argument that binds to nothing is refused before anything
+    runs. Until 2026-09-24 a second positional argument bound to -Evidence, which starts a
+    transcript with -Force: `run.ps1 a.Tests.ps1 b.Tests.ps1` overwrote b.Tests.ps1.
+    tests/RunnerTraps.Tests.ps1 holds both.
 #>
-[CmdletBinding()]
+[CmdletBinding(PositionalBinding = $false)]
 param(
     # Test files or directories to run. Defaults to every *.Tests.ps1 beside this script.
+    # The only positional parameter. To run several, name a folder.
+    [Parameter(Position = 0)]
     [string[]] $Path,
 
     # Tee the full transcript to this file as well as the screen.
-    [string] $Evidence
+    [string] $Evidence,
+
+    # Whatever bound to nothing above. Captured only so it can be refused by name.
+    [Parameter(ValueFromRemainingArguments)]
+    [string[]] $Unbound
 )
+
+if ($Unbound) {
+    [Console]::Error.WriteLine("run.ps1: refusing unbound argument(s): $($Unbound -join ' ')")
+    [Console]::Error.WriteLine('run.ps1: -Evidence must be named; to run several test files, pass their folder to -Path.')
+    exit 2
+}
 
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
@@ -59,13 +80,23 @@ try {
 
     $result = Invoke-Pester -Configuration $config
 
+    # The same question every gate asks, from build/Build.Helpers.psm1.
+    Import-Module (Join-Path $repoRoot 'build' 'Build.Helpers.psm1') -Force
+    $notLoaded = @(Get-SuiteLoadFailure -Result $result)
+
     Write-Host ''
-    Write-Host ("SUITE: {0} passed, {1} failed, {2} skipped" -f
-        $result.PassedCount, $result.FailedCount, $result.SkippedCount)
+    foreach ($n in $notLoaded) {
+        Write-Host "NOT LOADED: $($n.File)"
+        Write-Host "  $($n.Error)"
+    }
+    $summary = "SUITE: {0} passed, {1} failed, {2} skipped" -f
+        $result.PassedCount, $result.FailedCount, $result.SkippedCount
+    if ($notLoaded.Count -gt 0) { $summary += ", not run: $($notLoaded.Count) file(s) failed to load" }
+    Write-Host $summary
 }
 finally {
     if ($Evidence) { Stop-Transcript | Out-Null }
 }
 
-if ($result.FailedCount -gt 0) { exit 1 }
+if ($result.FailedCount -gt 0 -or $notLoaded.Count -gt 0) { exit 1 }
 exit 0
