@@ -49,7 +49,7 @@ BeforeAll {
 }
 
 Describe 'Sentinel: the vendored Ledger it depends on' -Tag 'Ledger' {
-    It 'has a manifest to import' -Skip {
+    It 'has a manifest to import' {
         $script:LedgerModule | Should -Exist
     }
 
