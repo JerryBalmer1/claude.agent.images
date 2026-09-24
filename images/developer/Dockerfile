@@ -107,6 +107,9 @@ RUN chown -R root:root /etc/claude-code \
 
 COPY hooks/ /opt/leash/hooks/
 COPY config/sentinel.json /opt/leash/config/sentinel.json
+# The core pin this image was built at, so it can be read back from inside the image and
+# compared with the gitlink (tests/Image.Tests.ps1).
+COPY config/vendor.json /opt/leash/config/vendor.json
 COPY src/ /opt/leash/src/
 COPY entrypoint.ps1 /opt/leash/entrypoint.ps1
 
