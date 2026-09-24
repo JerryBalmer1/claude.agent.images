@@ -76,7 +76,12 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
+      # GH_TOKEN is the workflow's own GITHUB_TOKEN - no PAT, no secret added. tests/MergeSettings.Tests.ps1
+      # reads the repository's merge settings through gh api graphql with it; without it gh has
+      # no credential and that test fails rather than passing on silence.
       - shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./scripts/ci/Invoke-Tests.ps1
 
   incontainer:
