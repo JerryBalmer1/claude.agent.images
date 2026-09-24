@@ -10,6 +10,49 @@ f ils the build r ther th n being believed.
 
 ---
 
+## 2026-09-23 23b1db9 run-01
+
+I12 PR 1, `feature/public-hygiene`: the repository is public, so it now carries a licence and keeps
+private names and addresses out of tracked files.
+
+**Changed:**
+
+- `LICENSE`, MIT, JerryBalmer1, 2026, stated in one line of `README.md`.
+- Scan of every tracked file at `e195e49`: 0 local user paths, 0 tokens or keys, 1 email address
+  (the line below at `:291` in the 2026-09-23 0c0f714 section), and 45 occurrences of the private
+  origin repository's name, 35 of them in live files. All live hits are edited.
+- `tests/PublicHygiene.Tests.ps1` fails on any of the four in a tracked file outside `.continuity/`.
+  Red at `e195e49`: host, and CI run 35952853389 (`pester` 2 failed, on email and name).
+- `DECISIONS.md` created. It lists the forensic records that carry a hit and are not edited.
+
+**Tested:** passed=161 failed=0 skipped=2 - in-container, `pwsh 7.6.6`, Pester 6.1.0, uid 1001,
+`unjustified_skips` empty. Five tests added.
+
+**Failed:** none.
+
+**Missing:**
+
+- Personal author addresses in git commit metadata and in older blobs of this file. They can only be
+  cleared by a history rewrite, which is not done here and never is. See `DECISIONS.md`.
+- The Docker-tagged tests still run nowhere in CI (I12 PR 4).
+
+**Blockers:**
+
+- **No signing key.** Not touched. Identity is operator-asserted.
+- **Command-hook timeout fails open.** Not touched. 15s PreToolUse, Claude Code semantics.
+- The receipt-append export blocker was struck on 2026-09-23 at seq 9 and is not relisted.
+
+**Ledger head hash:** `33a77e42c7a9f230735561fdbcd3abe28df294abb4d92671b0bffde536bd123a`
+(receipts at `output/ledger/ledger.jsonl`; `Goal.Update` checks its shape, not its value.)
+
+**Assessment hash:** `798b10ee3ca2d64b28bc779611484ddc0565448c6468ae2ddaf54a53a98030a3`
+- canonical sha256 of `prompts/assessment.2026-09-21.json`, unchanged and re-verified by
+`Bootstrap`.
+
+**Forensic chain:** decision before any edit at seq 29 (`public-hygiene`), the finding for
+records left unedited at seq 30 (`public-hygiene-records-not-edited`). `Goal.Update` appends its
+own `verification` record.
+
 ## 2026-09-23 439e2c4 run-01
 
 I11 PR B, jfe ture/drop-directory-gu rdj: jtests/run.ps1j no longer refuses on its folder n me. The
