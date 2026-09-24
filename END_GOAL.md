@@ -10,6 +10,90 @@ fails the build rather than being believed.
 
 ---
 
+## 2026-09-23 531b2e0 run-01
+
+I7: the skip-justification gate becomes a required check, on the host half.
+
+**Changed:**
+
+- **`scripts/ci/Invoke-Tests.ps1` now runs `Assert-SuiteClean`.** The `pester`
+  required check exited 1 on exactly two conditions - zero tests, and a failed test.
+  An unjustified skip went green there and red under `Invoke-Build Test.Unit`, so CI
+  passed what Full fails.
+- **`Assert-SuiteClean` moved to `build/Build.Helpers.psm1` and is exported.** It had
+  to move: it called `Write-Build`, an Invoke-Build command, so no plain pwsh script
+  could call it where it lived. That module already documents itself as
+  Invoke-Build-free, which is why the container imports it off the bind mount.
+  `Write-Build` became `Write-Host` with the same colours. It is the SAME function
+  both callers run, not a port.
+- **One behaviour change, parameterised rather than forked: `-ExcludeTag`.** Pester
+  reports a tag-excluded test as `NotRun`, which is not a skip. A `NotRun` whose
+  inherited tags include one of the excluded values is tolerated; every other
+  `NotRun`, and every `Inconclusive`, stays unjustified. `Test.Unit` passes nothing
+  and excludes nothing, so its verdict is unchanged. This is the rule
+  `build/InContainer.Test.ps1:159-164` already applies, so the host and container
+  gates now differ on `NotRun` by argument instead of by accident.
+- **`config/repo.json -> required_checks` untouched.** `pester` is already in it;
+  this changes what that check measures, not which checks exist, so
+  `generated-match-config` stays green without editing the config.
+
+**Tested:** passed=151 failed=0 skipped=2 - in-container, `pwsh 7.6.6`, Pester 6.1.0,
+uid 1001, total 174, `unjustified_skips` empty. Host `Test.Unit`: passed=172 failed=0
+skipped=2 NotRun=0 Inconclusive=0, reporting both skips as
+`no-exempt-commit-in-range` exactly as before the move. `scripts/ci/Invoke-Tests.ps1`
+run locally: exit 0, total=174 passed=151 skipped=2 NotRun=21, the same
+justified/unjustified split `output/incontainer.json` records. No test was added or
+removed this run.
+
+**Failed:** none.
+
+**Missing:**
+
+- **CI still cannot run the in-container suite.** `vendor/claude.agent.core` is a
+  private submodule and `actions/checkout` needs a PAT passed as `token:` -
+  FINDING-M17, Jerry to create. All **43** Ledger-tagged tests stay `NotRun` on the
+  runner, tolerated by the very `-ExcludeTag` this run adds. The host gate stops CI
+  passing what Full fails; it does not make CI prove what Full proves. Floor, not
+  ceiling.
+- The 21 Docker-tagged tests are still excluded in CI by design (FINDING-M13), so a
+  pull request that breaks the Dockerfile still goes green there.
+- `build/InContainer.Test.ps1` still implements the gate inline rather than calling
+  the shared function. Deliberate: it writes `output/incontainer.json` and its
+  reporting medium differs. Two implementations of one shared rule, now with two
+  callers on the host side.
+- `config/repo.json -> repo` still reads `JerryBalmer1/claude.pwsh.image.builder`.
+- **The repository is PUBLIC**, against `AGENTS.md`. `state.ps1` warns on every run.
+- The README still carries pre-birth wreckage - a `Test.FailFirst` row, a
+  `LEDGER_HOOK_ARM=1` example the law forbids, a `.agents/BREADCRUMBS.md` that does
+  not exist.
+
+**Blockers:**
+
+- **No signing key.** Not touched. Identity is operator-asserted.
+- **Command-hook timeout fails open.** Not touched. 15s PreToolUse, Claude Code
+  semantics.
+- The receipt-append export blocker was struck on 2026-09-23 at seq 9 and is not
+  relisted.
+
+**Ledger head hash:** `3951b581642acf5de6c9d81d818e91323a212941b686b72e93f27b0fca60ded6`
+(receipts at `output/ledger/ledger.jsonl`. It moves on every `Test.InContainer`, so
+`Goal.Update` checks its shape, not its value.)
+
+**Assessment hash:** `798b10ee3ca2d64b28bc779611484ddc0565448c6468ae2ddaf54a53a98030a3`
+- canonical sha256 of `prompts/assessment.2026-09-21.json`, unchanged and re-verified
+by `Bootstrap`.
+
+**Forensic chain:** decision recorded BEFORE the edit at seq 14, `kind=decision`,
+`subject=ci-pester-runs-assert-suite-clean`, `prev 28e12c75`, `self d531447d`.
+`Goal.Update` appends its own `verification` record, so this run adds two.
+
+**Falsified in the place it guards, not only on this desk.** A scratch commit
+carrying one `-Skip` with no tag was pushed to `feature/ci-suite-clean` and drove the
+`pester` check RED on the runner; the run URL is in the pull request body. A second
+commit removed it - not a force-push, `AGENTS.md` forbids one - and the check went
+green. Locally the same probe gave `scripts/ci/Invoke-Tests.ps1` exit 1 naming the
+test, with the two real skips still reported as justified.
+
 ## 2026-09-23 d6c54cb run-01
 
 Six governance items every packet since #1 had walked past, decided rather than
