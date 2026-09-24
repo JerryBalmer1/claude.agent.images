@@ -10,6 +10,179 @@ fails the build rather than being believed.
 
 ---
 
+## 2026-09-23 0807b9f run-01
+
+I13 PR 3, `feature/ci-network-resilience`: CI builds the images once per run, from a cache keyed on
+their inputs, and apt retries with a bounded backoff.
+
+**Changed:**
+
+- Both Dockerfiles: the apt layer makes five attempts, sleeping 2, 8, 18 and 32 seconds between them,
+  then exits 1. It uses `update --error-on=any`. With `--network none` in the pinned base: five
+  attempts, 96s, exit 1.
+- `Get-ImageInputHash` and `Invoke-ImageBuild` in `build/Build.Helpers.psm1`. An image labelled with the
+  hash of its inputs is reused, not rebuilt. `Build.Image` and `tests/Image.Tests.ps1` build through it.
+- `ci.yml`: a new `images` job builds and saves only on a cache miss, using `actions/cache`.
+  `pester` and `incontainer` need it and load its images. `images` is a required check, and
+  `docs/POLICY.md` and the PR template are regenerated.
+- `scripts/ci/Invoke-ImageCache.ps1` and `tests/ImageCache.Tests.ps1` (14 cases, red at `8bd59df`:
+  1 passed, 13 failed).
+
+**Tested:** passed=219 failed=0 skipped=6 - in-container, `pwsh 7.6.6`, Pester 6.1.0, uid 1001,
+wall 39.17s, `not_loaded` empty, `unjustified_skips` empty. Host: 246 / 0 / 2. Both images were
+rebuilt with the new apt layer once, in `tests/Image.Tests.ps1`. `Build.Image` then reused them,
+because their inputs were identical.
+
+**Failed:** none.
+
+**Missing:**
+
+- The postcondition (two consecutive CI runs on one commit, the second a cache hit that never reaches
+  `archive.ubuntu.com`) is measured after this commit is pushed. It is recorded in the PR body and
+  on the forensic chain, not here.
+- Cache scope: a `pull_request` run can restore caches from its own ref, its base branch and `main`.
+  It can't restore from its head branch. A PR's first run therefore builds once, unless `main` or
+  `develop` already holds the key.
+- A reused image keeps what the network returned when it was built: apt package versions, and
+  `CLAUDE_CODE_VERSION=latest`.
+
+**Blockers:**
+
+- **No signing key.** Not touched. Identity is operator-asserted.
+- **Command-hook timeout fails open.** Not touched. 15s PreToolUse, Claude Code semantics.
+- The receipt-append export blocker was struck on 2026-09-23 at seq 9 and is not relisted.
+
+**Ledger head hash:** `e1169ae06170b24a09ae9e2b964e94af6297202ea5635149841e255c8ffe7059`
+(shape checked, not value.)
+
+**Assessment hash:** `798b10ee3ca2d64b28bc779611484ddc0565448c6468ae2ddaf54a53a98030a3`
+- canonical sha256 of `prompts/assessment.2026-09-21.json`, unchanged and re-verified by `Bootstrap`.
+
+**Forensic chain:** `Goal.Update` appends its own `verification` record.
+
+## 2026-09-23 756b356 run-01
+
+I13 PR 2, `feature/root-cause-23b1db9`: what corrupted `END_GOAL.md` in `23b1db9` is named, reproduced, and
+refused at edit time.
+
+**Changed:**
+
+- Root cause, from the I12 session transcript: the inline edit held its one pair as `@( @('<old>','<new>') )`.
+  `@()` unrolls the inner array, so the loop indexed characters and replaced every backtick with `j`,
+  then every `a` with a space. Reproduced on `23b1db9~1`'s blob `b017750`: the result is blob `54901e2`,
+  which is `23b1db9`'s, byte for byte.
+- `scripts/Edit-Text.ps1`: parallel `-Old`/`-New`, each old string exactly once, and the declared line
+  diff is checked before writing. `tests/ScriptedEdit.Tests.ps1`, 8 cases.
+- `DECISIONS.md` names the bug. `FINDINGS.md` is new, with I13-F1. Sites in the tree using the pattern:
+  none.
+
+**Tested:** passed=204 failed=0 skipped=6 - in-container, `pwsh 7.6.6`, Pester 6.1.0, uid 1001,
+wall 39.34s, `not_loaded` empty, `unjustified_skips` empty. Host: 229 / 0 / 2.
+
+**Failed:** none.
+
+**Missing:**
+
+- The packet's suspect list was not worked through, because the transcript named the command. None of
+  the four was the cause.
+- `Edit-Text.ps1` guards edits made through it. It cannot stop an inline loop someone writes instead.
+  `EndGoalIntegrity.Tests.ps1` stays as the after-the-fact net for this file.
+
+**Blockers:**
+
+- **No signing key.** Not touched. Identity is operator-asserted.
+- **Command-hook timeout fails open.** Not touched. 15s PreToolUse, Claude Code semantics.
+- The receipt-append export blocker was struck on 2026-09-23 at seq 9 and is not relisted.
+
+**Ledger head hash:** `3328b363b268fe26e933bd6d5ca51d0e7ad2a89fe155a55891d4b5549c882f97`
+(shape checked, not value.)
+
+**Assessment hash:** `798b10ee3ca2d64b28bc779611484ddc0565448c6468ae2ddaf54a53a98030a3`
+- canonical sha256 of `prompts/assessment.2026-09-21.json`, unchanged and re-verified by `Bootstrap`.
+
+**Forensic chain:** finding at seq 46 (`end-goal-23b1db9-root-cause`). `Goal.Update` appends its own
+`verification` record.
+
+## 2026-09-23 fa19d1f run-01
+
+I13 PR 1, `feature/runner-traps`: every test gate fails on a test file that fails to load, and
+`tests/run.ps1` refuses a stray positional argument.
+
+**Changed:**
+
+- `Get-SuiteLoadFailure` in `build/Build.Helpers.psm1`. `Assert-SuiteClean` (Test.Unit, CI `pester`),
+  `build/InContainer.Test.ps1` and `tests/run.ps1` all fail on a file Pester could not load, and name
+  it. Before, every one read only `FailedCount`, which a failed container leaves at 0.
+- `tests/run.ps1`: `-Evidence` is named-only, and an unbound argument is refused with exit 2 before
+  any transcript starts.
+- `tests/RunnerTraps.Tests.ps1`, 7 cases. Red at `1f0c6d2`: 1 passed, 6 failed. Green after.
+
+**Tested:** passed=195 failed=0 skipped=6 - in-container, `pwsh 7.6.6`, Pester 6.1.0, uid 1001,
+wall 40.18s, `not_loaded` empty, `unjustified_skips` empty. Host: 220 / 0 / 2 through the fixed
+runner and through Test.Unit.
+
+**Failed:** none.
+
+**Missing:**
+
+- The gate was fixed by this PR, so the PR was first measured by hand, through the fixed `run.ps1`.
+  `Invoke-Build Full` afterwards goes through the fixed gate too.
+- No test was silently not running before: 16 files load on the host, and CI run 35958785133
+  discovered 215 tests in `pester` and 215 in-container, the same as the host at `1f0c6d2`.
+
+**Blockers:**
+
+- **No signing key.** Not touched. Identity is operator-asserted.
+- **Command-hook timeout fails open.** Not touched. 15s PreToolUse, Claude Code semantics.
+- The receipt-append export blocker was struck on 2026-09-23 at seq 9 and is not relisted.
+
+**Ledger head hash:** `fdbb7f8738ad2c71e0dc978d1cc8ef5ba7b976b3099a6b750dd776ae7c120d00`
+(shape checked, not value.)
+
+**Assessment hash:** `798b10ee3ca2d64b28bc779611484ddc0565448c6468ae2ddaf54a53a98030a3`
+- canonical sha256 of `prompts/assessment.2026-09-21.json`, unchanged and re-verified by `Bootstrap`.
+
+**Forensic chain:** `Goal.Update` appends its own `verification` record.
+
+## 2026-09-23 4290102 run-01
+
+I12, after the promotion, `feature/ci-on-main-self-run`: the ci-on-main check from PR 3 was
+self-referential, and this fixes it.
+
+**Changed:**
+
+- `tests/CiOnMain.Tests.ps1`: the live claim measures the packet's word, *completed*. Inside the ci run
+  for main's tip, that run (`GITHUB_RUN_ID`) is the evidence. `AGENTS.md` wording follows.
+
+**Tested:** passed=188 failed=0 skipped=6 - in-container, `pwsh 7.6.6`, Pester 6.1.0, uid 1001,
+`unjustified_skips` empty. Host: the live check passes and reports `bc7b64c`, 1 completed ci run,
+conclusion failure.
+
+**Failed:** none in this tree. **On main:** `bc7b64c`'s only ci run, 35957396113 (dispatched by hand,
+by claude), failed on the defective check this fixes. `main` keeps that copy of the test until the
+next promotion.
+
+**Missing:**
+
+- The in-run branch runs only on a runner, so its first real exercise is the next promotion's
+  automerge dispatch.
+- `bc7b64c` has no successful ci run, and none is manufactured.
+
+**Blockers:**
+
+- **No signing key.** Not touched. Identity is operator-asserted.
+- **Command-hook timeout fails open.** Not touched. 15s PreToolUse, Claude Code semantics.
+- The receipt-append export blocker was struck on 2026-09-23 at seq 9 and is not relisted.
+
+**Ledger head hash:** `33a77e42c7a9f230735561fdbcd3abe28df294abb4d92671b0bffde536bd123a`
+(shape checked, not value.)
+
+**Assessment hash:** `798b10ee3ca2d64b28bc779611484ddc0565448c6468ae2ddaf54a53a98030a3`
+- canonical sha256 of `prompts/assessment.2026-09-21.json`, unchanged and re-verified by `Bootstrap`.
+
+**Forensic chain:** confession at seq 42 (`ci-on-main-test-self-referential`). `Goal.Update` appends
+its own `verification` record.
+
 ## 2026-09-23 6ab3298 run-01
 
 I12 PR 5, `feature/ledger-receipt-caller`: `src/LedgerReceipt.ps1` is deleted. It shipped in both

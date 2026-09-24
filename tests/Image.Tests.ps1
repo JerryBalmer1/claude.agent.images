@@ -174,16 +174,34 @@ Describe 'Image builds and runs correctly' -Tag 'Docker' {
         # process's working directory, which is not necessarily where Pester
         # was started from, and the failure reads as "no such file or
         # directory" rather than "your path was relative".
-        $script:BuildLeash = Invoke-Docker -Arguments @('build', '-f', $script:LeashDockerfile, '-t', $script:LeashTag, $script:RepoRoot)
-        $script:BuildDev = Invoke-Docker -Arguments @('build', '-f', (Join-Path $script:RepoRoot 'images' 'developer' 'Dockerfile'), '-t', $script:DevTag, $script:RepoRoot)
+        #
+        # Through Invoke-ImageBuild, as Build.Image builds them: an image already carrying the label
+        # for these exact inputs is reused, which is how CI's cached images reach this test without
+        # a rebuild or apt (I13 PR 3).
+        Import-Module (Join-Path $script:RepoRoot 'build' 'Build.Helpers.psm1') -Force
+        $script:BuildLeash = Invoke-ImageBuild -ContextRoot $script:RepoRoot -Dockerfile $script:LeashDockerfile -Tag $script:LeashTag -Quiet
+        $script:BuildDev = Invoke-ImageBuild -ContextRoot $script:RepoRoot -Dockerfile $script:DevDockerfile -Tag $script:DevTag -Quiet
     }
 
     It 'builds the leash image' {
-        $script:BuildLeash.ExitCode | Should -Be 0 -Because $script:BuildLeash.StdErr
+        $script:BuildLeash.ExitCode | Should -Be 0 -Because $script:BuildLeash.Output
     }
 
     It 'builds the developer image' {
-        $script:BuildDev.ExitCode | Should -Be 0 -Because $script:BuildDev.StdErr
+        $script:BuildDev.ExitCode | Should -Be 0 -Because $script:BuildDev.Output
+    }
+
+    It '<Tag> carries the label for its inputs, and building again reuses it' -ForEach @(
+        @{ Tag = 'claude.pwsh.image.leash:run-01'; File = 'Dockerfile' }
+        @{ Tag = 'claude.pwsh.image.developer:run-01'; File = 'images/developer/Dockerfile' }
+    ) {
+        $df = Join-Path $script:RepoRoot $File
+        $hash = Get-ImageInputHash -ContextRoot $script:RepoRoot -Dockerfile $df
+        $label = Invoke-Docker -Arguments @('image', 'inspect', '--format', '{{ index .Config.Labels "org.leash.inputs" }}', $Tag)
+        $label.StdOut.Trim() | Should -Be $hash
+        $again = Invoke-ImageBuild -ContextRoot $script:RepoRoot -Dockerfile $df -Tag $Tag -Quiet
+        $again.ExitCode | Should -Be 0
+        $again.Reused | Should -BeTrue -Because 'nothing it reads changed since the build above'
     }
 
     It '<Tag> runs as a non-root user' -ForEach @(

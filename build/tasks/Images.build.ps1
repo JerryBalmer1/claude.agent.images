@@ -15,6 +15,10 @@
     anyone ran it, which is precisely the "no stub files, no TODO that ships"
     rule in AGENTS.md being broken by the build system itself. An agent image
     can be added when there is one to add.
+
+    Both go through Invoke-ImageBuild (build/Build.Helpers.psm1), which skips the build when the
+    tag already carries the label for these exact inputs. That is what lets CI load the images
+    job's cached images and run no apt after it (I13 PR 3).
 #>
 
 # Synopsis: Build the enforcing leash image.
@@ -22,7 +26,8 @@ task Build.Image.Leash {
     $root = $Build.RepositoryRoot
     $file = Join-Path $root 'Dockerfile'
     Write-Build Cyan "Building $($Build.LeashTag) ..."
-    exec { docker build -f $file -t $Build.LeashTag $root }
+    $r = Invoke-ImageBuild -ContextRoot $root -Dockerfile $file -Tag $Build.LeashTag
+    if ($r.ExitCode -ne 0) { throw "docker build failed for $($Build.LeashTag), exit $($r.ExitCode)" }
     Write-Build Green "Built $($Build.LeashTag)"
 }
 
@@ -34,7 +39,8 @@ task Build.Image.Developer {
         throw "Developer Dockerfile missing: $file"
     }
     Write-Build Cyan "Building $($Build.DeveloperTag) ..."
-    exec { docker build -f $file -t $Build.DeveloperTag $root }
+    $r = Invoke-ImageBuild -ContextRoot $root -Dockerfile $file -Tag $Build.DeveloperTag
+    if ($r.ExitCode -ne 0) { throw "docker build failed for $($Build.DeveloperTag), exit $($r.ExitCode)" }
     Write-Build Green "Built $($Build.DeveloperTag)"
 }
 

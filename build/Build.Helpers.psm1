@@ -289,6 +289,14 @@ function Assert-SuiteClean {
 
     $excluded = @($ExcludeTag | Where-Object { $_ })
 
+    # First, because a file that did not load has no tests in any count below: FailedCount,
+    # the skip verdicts and PassedCount all read as if the file did not exist.
+    $notLoaded = @(Get-SuiteLoadFailure -Result $Result)
+    if ($notLoaded.Count -gt 0) {
+        throw ("${Where}: $($notLoaded.Count) test file(s) failed to load; their tests did not run:`n  " +
+            (@($notLoaded | ForEach-Object { "$($_.File)`n    $($_.Error)" }) -join "`n  "))
+    }
+
     if ($Result.FailedCount -gt 0) {
         $names = @($Result.Tests | Where-Object Result -eq 'Failed' | ForEach-Object { $_.ExpandedPath })
         # ${Where} and not $Where: a colon straight after a variable name makes
@@ -342,6 +350,160 @@ function Assert-SuiteClean {
     }
 }
 
+function Get-SuiteLoadFailure {
+    <#
+    .SYNOPSIS
+        One object per test file that failed to load, with the file and the error.
+
+    .DESCRIPTION
+        A file that fails to parse, or throws while Pester discovers it, is a FAILED CONTAINER.
+        Pester counts it in FailedContainersCount and leaves FailedCount at 0, and its tests
+        appear in no count at all. Until 2026-09-24 every gate in this repository read only
+        FailedCount - tests/run.ps1, Assert-SuiteClean, build/InContainer.Test.ps1 - so such a
+        file was green by omission. Measured at 1f0c6d2: a file with a syntax error, runner
+        exit 0. tests/RunnerTraps.Tests.ps1 holds each gate to this.
+
+        Every caller asks this one function, so the gates cannot disagree about what "did not
+        load" means.
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)]$Result)
+
+    if (-not ($Result.PSObject.Properties.Name -contains 'FailedContainersCount')) { return }
+    if ($Result.FailedContainersCount -le 0) { return }
+
+    foreach ($c in @($Result.FailedContainers)) {
+        [pscustomobject]@{
+            File  = [string]$c.Item
+            Error = (@($c.ErrorRecord | ForEach-Object { $_.Exception.Message }) -join ' | ')
+        }
+    }
+}
+
+function Get-ImageCopySource {
+    <#
+    .SYNOPSIS
+        The context-relative sources of every COPY line in a Dockerfile, in order.
+
+    .DESCRIPTION
+        Only the forms these Dockerfiles use: COPY [--flag ...] <src>... <dest> on one line. A
+        COPY --from reads another stage, not the context, so it has no source here. A wildcard,
+        or a COPY continued onto the next line, throws rather than being hashed wrongly: an input
+        missed here is a stale image served from cache.
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Dockerfile)
+
+    foreach ($line in [System.IO.File]::ReadAllLines($Dockerfile)) {
+        if ($line -notmatch '^\s*COPY\s+(.+)$') { continue }
+        $rest = $Matches[1].Trim()
+        if ($rest.EndsWith('\')) { throw "${Dockerfile}: a COPY continued onto the next line is not supported: $line" }
+        if ($rest -match '--from=') { continue }
+        $tokens = @($rest -split '\s+' | Where-Object { $_ -notlike '--*' })
+        if ($tokens.Count -lt 2) { throw "${Dockerfile}: COPY with no source: $line" }
+        foreach ($src in $tokens[0..($tokens.Count - 2)]) {
+            if ($src -match '[\*\?\[]') { throw "${Dockerfile}: a wildcard COPY source is not supported: $src" }
+            $src
+        }
+    }
+}
+
+function Get-ImageInputHash {
+    <#
+    .SYNOPSIS
+        sha256 over everything an image build reads: the Dockerfile, .dockerignore, and every file
+        under every COPY source, by context-relative path and content.
+
+    .DESCRIPTION
+        The key for reusing an image instead of rebuilding it (Invoke-ImageBuild) and for the CI
+        image cache (scripts/ci/Invoke-ImageCache.ps1). It is the INPUTS, not the Dockerfile
+        alone: keyed on the Dockerfile, a change to hooks/ would be served a stale image. Bytes
+        are hashed as they are, because COPY copies them as they are.
+
+        What it does not see: what the network returns at build time. The Dockerfile pins the base
+        by digest and pwsh by sha256, but apt package versions and CLAUDE_CODE_VERSION=latest
+        are resolved when the image is built, so a reused image keeps what they were then.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$ContextRoot,
+        [Parameter(Mandatory)][string]$Dockerfile
+    )
+
+    $root = (Resolve-Path -LiteralPath $ContextRoot).ProviderPath
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    $entries = [System.Collections.Generic.List[string]]::new()
+    $fileHash = { param($p) [Convert]::ToHexString($sha.ComputeHash([System.IO.File]::ReadAllBytes($p))).ToLowerInvariant() }
+
+    $entries.Add("dockerfile $(& $fileHash $Dockerfile)")
+    $ignore = Join-Path $root '.dockerignore'
+    if (Test-Path -LiteralPath $ignore) { $entries.Add(".dockerignore $(& $fileHash $ignore)") }
+
+    foreach ($src in @(Get-ImageCopySource -Dockerfile $Dockerfile)) {
+        $path = Join-Path $root $src
+        if (Test-Path -LiteralPath $path -PathType Leaf) {
+            $entries.Add("copy $src $(& $fileHash $path)")
+        }
+        elseif (Test-Path -LiteralPath $path -PathType Container) {
+            $files = @(Get-ChildItem -LiteralPath $path -Recurse -File -Force |
+                ForEach-Object { [pscustomobject]@{ Rel = [System.IO.Path]::GetRelativePath($root, $_.FullName).Replace('\', '/'); Full = $_.FullName } } |
+                Sort-Object -Property Rel -Culture ([cultureinfo]::InvariantCulture) -CaseSensitive)
+            $entries.Add("copy $src $($files.Count) file(s)")
+            foreach ($f in $files) { $entries.Add("  $($f.Rel) $(& $fileHash $f.Full)") }
+        }
+        else {
+            throw "COPY source '$src' in $Dockerfile does not exist under $root"
+        }
+    }
+
+    $sha.Dispose()
+    Get-StringSha256 -Text ($entries -join "`n")
+}
+
+function Invoke-ImageBuild {
+    <#
+    .SYNOPSIS
+        Build an image, or reuse the one already tagged if it was built from the same inputs.
+
+    .DESCRIPTION
+        The image is labelled org.leash.inputs=<Get-ImageInputHash>. If the tag already carries
+        that label, nothing is built: the image was made from exactly these inputs. CI loads the
+        images job's saved images before its tests, so on a cache hit neither the Docker-tagged
+        tests nor Test.InContainer run apt. Any input change changes the hash, and the image is
+        rebuilt.
+
+        Returns Tag, Hash, Reused, ExitCode and Output. It does not throw on a failed build: the
+        Build.Image tasks throw, and tests/Image.Tests.ps1 asserts on the exit code.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$ContextRoot,
+        [Parameter(Mandatory)][string]$Dockerfile,
+        [Parameter(Mandatory)][string]$Tag,
+        [switch]$Quiet
+    )
+
+    $PSNativeCommandUseErrorActionPreference = $false
+    $ErrorActionPreference = 'Continue'
+
+    $hash = Get-ImageInputHash -ContextRoot $ContextRoot -Dockerfile $Dockerfile
+    $have = (& docker image inspect --format '{{ index .Config.Labels "org.leash.inputs" }}' $Tag 2>$null | Out-String).Trim()
+    if ($LASTEXITCODE -eq 0 -and $have -eq $hash) {
+        Write-Host "image: $Tag is current (inputs $($hash.Substring(0, 12))), not rebuilt"
+        return [pscustomobject]@{ Tag = $Tag; Hash = $hash; Reused = $true; ExitCode = 0; Output = '' }
+    }
+
+    Write-Host "image: building $Tag (inputs $($hash.Substring(0, 12)))"
+    $lines = [System.Collections.Generic.List[string]]::new()
+    & docker build --label "org.leash.inputs=$hash" -f $Dockerfile -t $Tag $ContextRoot 2>&1 | ForEach-Object {
+        $l = "$_"
+        $lines.Add($l)
+        if (-not $Quiet) { Write-Host $l }
+    }
+    [pscustomobject]@{ Tag = $Tag; Hash = $hash; Reused = $false; ExitCode = $LASTEXITCODE; Output = ($lines -join "`n") }
+}
+
 Export-ModuleMember -Function 'ConvertTo-CanonicalObject', 'ConvertTo-CanonicalJson',
     'Get-StringSha256', 'Get-CanonicalJsonSha256', 'Test-AssessmentHash',
-    'Get-SkipJustification', 'Assert-SuiteClean'
+    'Get-SkipJustification', 'Assert-SuiteClean', 'Get-SuiteLoadFailure',
+    'Get-ImageCopySource', 'Get-ImageInputHash', 'Invoke-ImageBuild'

@@ -36,19 +36,34 @@ ENV DEBIAN_FRONTEND=noninteractive
 # The leash image deliberately gets neither this nor python at all. It never spawns the
 # snake: its entrypoint verifies and its sentinel appends, and both of those are PowerShell.
 # Its 11 python.Tests.ps1 reds are by design, not a gap to close here.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        ca-certificates \
-        curl \
-        git \
-        less \
-        libicu74 \
-        libssl3 \
-        locales \
-        python-is-python3 \
-        python3 \
-        python3-pip \
-        sudo \
-    && rm -rf /var/lib/apt/lists/*
+#
+# apt retries with a bounded backoff: five attempts, sleeping 2, 8, 18 and 32 seconds between
+# them, then the build fails. `--error-on=any`, because a plain `apt-get update` exits 0 when it
+# cannot resolve the mirror and the failure then surfaces at install as a missing package. One
+# CI run failed on DNS for archive.ubuntu.com (I12). Measured in this base with --network none:
+# five attempts, 96s, exit 1. The layer is the same in both Dockerfiles but for the package list.
+RUN set -eu; \
+    for attempt in 1 2 3 4 5; do \
+        if apt-get -o Acquire::Retries=3 update --error-on=any \
+            && apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
+                ca-certificates \
+                curl \
+                git \
+                less \
+                libicu74 \
+                libssl3 \
+                locales \
+                python-is-python3 \
+                python3 \
+                python3-pip \
+                sudo; then \
+            break; \
+        fi; \
+        if [ "$attempt" -eq 5 ]; then echo "apt: gave up after $attempt attempts" >&2; exit 1; fi; \
+        echo "apt: attempt $attempt failed, retrying in $((attempt * attempt * 2))s" >&2; \
+        sleep $((attempt * attempt * 2)); \
+    done; \
+    rm -rf /var/lib/apt/lists/*
 
 RUN set -eu; \
     curl -fsSL -o /tmp/powershell.tar.gz "${PWSH_URL}"; \
