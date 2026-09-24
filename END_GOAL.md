@@ -143,6 +143,9 @@ tracked.
   `.github/workflows/ci.yml:60-80` still names `vendor/claude.build.ledger` and
   `claude.build.ledger` as the private submodule; the submodule is `vendor/claude.agent.core`.
   Doubly stale, not edited here.
+  *Annotated 2026-09-23, original words kept above: acted on. PR #9 rewrote the `ci.yml`
+  comment and added `submodules: recursive` (seq 19); its pester job ran the 43 tests with
+  no token. M17 is retired at seq 21.*
 - `config/repo.json -> repo` and `schemas/repo.schema.json:3` both still name
   `claude.pwsh.image.builder`.
 - The README still carries pre-birth wreckage: a `Test.FailFirst` row for a deleted task,
@@ -221,6 +224,10 @@ removed this run.
   runner, tolerated by the very `-ExcludeTag` this run adds. The host gate stops CI
   passing what Full fails; it does not make CI prove what Full proves. Floor, not
   ceiling.
+  *Annotated 2026-09-23, original words kept above: the private premise was false by then -
+  core was public. No PAT was ever needed. The Ledger-tagged tests have run in the pester
+  check since PR #9, and an absent submodule now fails it rather than excluding them. M17 is
+  retired at seq 21.*
 - The 21 Docker-tagged tests are still excluded in CI by design (FINDING-M13), so a
   pull request that breaks the Dockerfile still goes green there.
 - `build/InContainer.Test.ps1` still implements the gate inline rather than calling
@@ -326,6 +333,8 @@ of the 171 to 172 and 150 to 151 movement.
 - CI still cannot run the in-container suite. `vendor/claude.agent.core` is a private
   submodule and `actions/checkout` needs a PAT passed as `token:` - FINDING-M17,
   Jerry to create. The Ledger-tagged tests stay `NotRun` on the runner.
+  *Annotated 2026-09-23, original words kept above: the private premise was false - core
+  is public and needs no PAT. M17 is retired at seq 21; see the newer sections.*
 - `config/repo.json -> repo` still reads `JerryBalmer1/claude.pwsh.image.builder`.
   Stale in the same way `state.ps1` was, and not fixed here: it is an input to the
   `generated-match-config` check and changing it is its own decision. Listed.
