@@ -138,12 +138,21 @@ five Pester suites: `Entrypoint`, `Image`, `Plan`, `Sentinel`, `Settings`, plus 
 
 - **chain-verify: `Get-LedgerVerify`** — exported, and live: `entrypoint.ps1` calls it at boot and
   exits 14 on a broken chain.
-- **receipt-append: `pending-exports`** — `Add-LedgerRecord` exists at `Ledger.psm1:298` but is
-  absent from `Export-ModuleMember` at `Ledger.psm1:1121`. `hooks/sentinel.ps1` reaches it through
-  the module's own session state, which is a coupling to a private name.
+- **receipt-append: `pending-exports` — as measured on 2026-09-21, and RETIRED 2026-09-23.**
+  `Add-LedgerRecord` existed at `Ledger.psm1:298` but was absent from `Export-ModuleMember` at
+  `Ledger.psm1:1121`, so `hooks/sentinel.ps1` reached it through the module's own session state,
+  which was a coupling to a private name.
 
-So the status is **not** UNWIRED. It is wired, with one named private-name coupling — BLOCKER-1,
-and the fix belongs in `claude.build.ledger`, not here.
+So the status was **not** UNWIRED. It was wired, with one named private-name coupling, and the fix
+belonged in `claude.build.ledger`, not here.
+
+> **Retired 2026-09-23.** The wording of the bullet above was moved to the past tense on that
+> date and nothing else about this section changed: the measurement it reports is still the
+> 2026-09-21 one. The coupling it names — the first-numbered blocker of that run — no longer
+> exists. At vendor pin `a68664e` the module exports `Add-LedgerRecord` from both `ledger.psd1:9`
+> and `ledger.psm1:1121-1122`, `hooks/sentinel.ps1` calls it plainly, and the session-state reach
+> was deleted. The fix did belong in the Ledger, and that is where it landed. Forensic chain
+> seq 9, `blocker-1-retired`.
 
 ### 7. Dockerfiles
 

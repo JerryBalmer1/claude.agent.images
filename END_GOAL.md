@@ -10,6 +10,293 @@ fails the build rather than being believed.
 
 ---
 
+## 2026-09-23 531b2e0 run-01
+
+I7: the skip-justification gate becomes a required check, on the host half.
+
+**Changed:**
+
+- **`scripts/ci/Invoke-Tests.ps1` now runs `Assert-SuiteClean`.** The `pester`
+  required check exited 1 on exactly two conditions - zero tests, and a failed test.
+  An unjustified skip went green there and red under `Invoke-Build Test.Unit`, so CI
+  passed what Full fails.
+- **`Assert-SuiteClean` moved to `build/Build.Helpers.psm1` and is exported.** It had
+  to move: it called `Write-Build`, an Invoke-Build command, so no plain pwsh script
+  could call it where it lived. That module already documents itself as
+  Invoke-Build-free, which is why the container imports it off the bind mount.
+  `Write-Build` became `Write-Host` with the same colours. It is the SAME function
+  both callers run, not a port.
+- **One behaviour change, parameterised rather than forked: `-ExcludeTag`.** Pester
+  reports a tag-excluded test as `NotRun`, which is not a skip. A `NotRun` whose
+  inherited tags include one of the excluded values is tolerated; every other
+  `NotRun`, and every `Inconclusive`, stays unjustified. `Test.Unit` passes nothing
+  and excludes nothing, so its verdict is unchanged. This is the rule
+  `build/InContainer.Test.ps1:159-164` already applies, so the host and container
+  gates now differ on `NotRun` by argument instead of by accident.
+- **`config/repo.json -> required_checks` untouched.** `pester` is already in it;
+  this changes what that check measures, not which checks exist, so
+  `generated-match-config` stays green without editing the config.
+
+**Tested:** passed=151 failed=0 skipped=2 - in-container, `pwsh 7.6.6`, Pester 6.1.0,
+uid 1001, total 174, `unjustified_skips` empty. Host `Test.Unit`: passed=172 failed=0
+skipped=2 NotRun=0 Inconclusive=0, reporting both skips as
+`no-exempt-commit-in-range` exactly as before the move. `scripts/ci/Invoke-Tests.ps1`
+run locally: exit 0, total=174 passed=151 skipped=2 NotRun=21, the same
+justified/unjustified split `output/incontainer.json` records. No test was added or
+removed this run.
+
+**Failed:** none.
+
+**Missing:**
+
+- **CI still cannot run the in-container suite.** `vendor/claude.agent.core` is a
+  private submodule and `actions/checkout` needs a PAT passed as `token:` -
+  FINDING-M17, Jerry to create. All **43** Ledger-tagged tests stay `NotRun` on the
+  runner, tolerated by the very `-ExcludeTag` this run adds. The host gate stops CI
+  passing what Full fails; it does not make CI prove what Full proves. Floor, not
+  ceiling.
+- The 21 Docker-tagged tests are still excluded in CI by design (FINDING-M13), so a
+  pull request that breaks the Dockerfile still goes green there.
+- `build/InContainer.Test.ps1` still implements the gate inline rather than calling
+  the shared function. Deliberate: it writes `output/incontainer.json` and its
+  reporting medium differs. Two implementations of one shared rule, now with two
+  callers on the host side.
+- `config/repo.json -> repo` still reads `JerryBalmer1/claude.pwsh.image.builder`.
+- **The repository is PUBLIC**, against `AGENTS.md`. `state.ps1` warns on every run.
+- The README still carries pre-birth wreckage - a `Test.FailFirst` row, a
+  `LEDGER_HOOK_ARM=1` example the law forbids, a `.agents/BREADCRUMBS.md` that does
+  not exist.
+
+**Blockers:**
+
+- **No signing key.** Not touched. Identity is operator-asserted.
+- **Command-hook timeout fails open.** Not touched. 15s PreToolUse, Claude Code
+  semantics.
+- The receipt-append export blocker was struck on 2026-09-23 at seq 9 and is not
+  relisted.
+
+**Ledger head hash:** `3951b581642acf5de6c9d81d818e91323a212941b686b72e93f27b0fca60ded6`
+(receipts at `output/ledger/ledger.jsonl`. It moves on every `Test.InContainer`, so
+`Goal.Update` checks its shape, not its value.)
+
+**Assessment hash:** `798b10ee3ca2d64b28bc779611484ddc0565448c6468ae2ddaf54a53a98030a3`
+- canonical sha256 of `prompts/assessment.2026-09-21.json`, unchanged and re-verified
+by `Bootstrap`.
+
+**Forensic chain:** decision recorded BEFORE the edit at seq 14, `kind=decision`,
+`subject=ci-pester-runs-assert-suite-clean`, `prev 28e12c75`, `self d531447d`.
+`Goal.Update` appends its own `verification` record, so this run adds two.
+
+**Falsified in the place it guards, not only on this desk.** A scratch commit
+carrying one `-Skip` with no tag was pushed to `feature/ci-suite-clean` and drove the
+`pester` check RED on the runner; the run URL is in the pull request body. A second
+commit removed it - not a force-push, `AGENTS.md` forbids one - and the check went
+green. Locally the same probe gave `scripts/ci/Invoke-Tests.ps1` exit 1 naming the
+test, with the two real skips still reported as justified.
+
+## 2026-09-23 d6c54cb run-01
+
+Six governance items every packet since #1 had walked past, decided rather than
+deferred again. One decision record, seq 12, covering all six.
+
+**Changed:**
+
+- **`docs/plans/ACTIVE.md` retired; the stale-plan STOP reinstated with a reading.**
+  The file had been in the tree since the birth commit `f1aeb60`, naming
+  `feature/env-local` from two features ago. `AGENTS.md` row 2 suspended the STOP
+  because "ACTIVE.md does not exist here" - false from birth. The row now reads: no
+  `ACTIVE.md` means no active plan, a legal state, and the STOP fires only when the
+  file exists and names a branch other than the current one. It names the four pull
+  requests that walked past it - #1 `b03aa76`, #2 `66a78d6`, #3 `3e47c9e`,
+  #4 `bcd8fa4`. `scripts/state.ps1` printed the opposite reading and is corrected;
+  `AGENTS.md:24-31` and `FLOW.md:187-188` are deliberately not edited, because the
+  disagreement table is where a reading lives.
+- **The frozen-plans justification retired; the rule in force given a test.**
+  `tests/Repo.Tests.ps1` excluded `docs/plans/` as FROZEN RECORDS "covered by a
+  HASHES.txt". No HASHES.txt is tracked in this repository at all; the only one
+  reachable is in `vendor/claude.agent.core` at pin `a68664e` and covers nine
+  artefacts belonging to core. Nor are plans frozen here - `e221ddb` edited four
+  plan sites. The rule actually in force is now asserted rather than asserted-about:
+  a plan may be annotated in past tense with a date, original measurements
+  preserved. Eight recorded measurements are pinned; a changed number fails, a dated
+  annotation does not. The `^docs/plans/` exclusion itself stays, because
+  `ASSESSMENT.md:406` carries the pre-move path.
+- **The D7 `Add-LedgerReceipt` objection: open in core, closed in images.** Measured
+  at pin `a68664e6b9938773478d967348b590f487fe2443`: the name exists in neither tree
+  and core exports the raw `Add-LedgerRecord` at `ledger.psd1:9`. A wrapper over a
+  Ledger export is Ledger API; this repository consumes core and adds none, so the
+  objection stops reading as an unmet obligation of this tree. No wrapper written,
+  core untouched.
+- **Clause (b) of promotion written into the README.** It is the exit code of
+  `Invoke-Build Test.InContainer`, not the suite tally inside it: at `3e47c9e` the
+  container reported `passed=150 failed=0 skipped=2` and the task still exited 1.
+  The README had no definition of done at all, so the section was created to hold
+  the rule.
+- **`scripts/state.ps1` runs here.** The guard pinned the origin to
+  `claude.pwsh.image.builder` and exited 1 in this repository, which is why every
+  state block since birth was hand-assembled. No name list replaces it: the origin
+  is read and printed, and what is asserted is that the work tree being reported on
+  is the work tree this copy of the script lives in. Falsified from another clone:
+  exit 1, both paths named.
+- **`scripts/ci/Test-PushGuard.ps1:44`** named `config/trailer-grandfather.txt`; the
+  file is at `.continuity/trailer-grandfather.txt`. Comment only. The provenance
+  header three lines up claimed byte-identical-at-copy-time, which that edit
+  falsifies, so it moves to adapted=YES and says what the difference is.
+
+**Tested:** passed=151 failed=0 skipped=2 - in-container, `pwsh 7.6.6`, Pester 6.1.0,
+uid 1001, total 174, 34.76s, `unjustified_skips` empty and both real skips reported
+as `no-exempt-commit-in-range`. Host `Test.Unit`: passed=172 failed=0 skipped=2
+NotRun=0 Inconclusive=0. Host `tests/run.ps1` (Pester 5.7.1): 172 passed, 0 failed,
+2 skipped. One test added this run - the plan-annotation rule - which is the whole
+of the 171 to 172 and 150 to 151 movement.
+
+**Failed:** none.
+
+**Missing:**
+
+- The skip-justification gate is still not in the CI required set. That is I7, the
+  next pull request on this branch line, and `config/repo.json -> required_checks`
+  is untouched here.
+- CI still cannot run the in-container suite. `vendor/claude.agent.core` is a private
+  submodule and `actions/checkout` needs a PAT passed as `token:` - FINDING-M17,
+  Jerry to create. The Ledger-tagged tests stay `NotRun` on the runner.
+- `config/repo.json -> repo` still reads `JerryBalmer1/claude.pwsh.image.builder`.
+  Stale in the same way `state.ps1` was, and not fixed here: it is an input to the
+  `generated-match-config` check and changing it is its own decision. Listed.
+- **The repository is PUBLIC.** `AGENTS.md` says "Never make this repo public".
+  `state.ps1` prints the warning on every run now that it runs at all. Not an agent
+  decision to reverse; listed loudly.
+- The README still carries pre-birth wreckage the clause-(b) section sits beside: a
+  `Test.FailFirst` row for a task that was deleted, a `docker run` example passing
+  `LEDGER_HOOK_ARM=1` that `AGENTS.md` forbids (disagreement row 4), and a
+  `.agents/BREADCRUMBS.md` that does not exist. Row 4 already says the README is
+  wrong; this run added a section rather than rebuilding the file.
+
+**Blockers:**
+
+- **No signing key.** Not touched. `actor` and `LEDGER_PRINCIPAL` are
+  operator-asserted and are places to be caught lying, not signatures.
+- **Command-hook timeout fails open.** Not touched. The 15s PreToolUse timeout is
+  Claude Code semantics; a sentinel that hangs is a sentinel that is not consulted.
+- The receipt-append export blocker was struck on 2026-09-23 at seq 9 and is not
+  relisted; see the 2026-09-21 section for its history.
+
+**Ledger head hash:** `841c9dd4a2968a4ae7851bdf74a7c0c083ffe174a5fe9fda00728a685fec8742`
+(receipts at `output/ledger/ledger.jsonl`, written by the sentinel baked into the
+image. It moves on every `Test.InContainer`, so `Goal.Update` checks its shape, not
+its value.)
+
+**Assessment hash:** `798b10ee3ca2d64b28bc779611484ddc0565448c6468ae2ddaf54a53a98030a3`
+- canonical sha256 of `prompts/assessment.2026-09-21.json`, unchanged by this run and
+re-verified by `Bootstrap`.
+
+**Forensic chain:** the decision was recorded BEFORE any edit, at seq 12,
+`kind=decision`, `subject=tidy-before-promotion-six-items`, `prev 41aafeb2`,
+`self a0a3ce9e`. `Goal.Update` appends its own `verification` record at the end of
+this run, so this run adds two records.
+
+**Falsified, not asserted.** The new plan-annotation test was driven both ways with
+scratch edits to `docs/plans/2026-09-21-oneshot/END_GOAL.DRAFT.md`, each reverted and
+the tree verified clean: `passed=109` rewritten to `passed=110` gave exit 1 naming the
+file and the value, and a dated past-tense annotation appended to the same file gave
+exit 0. The rewritten `state.ps1` guard was driven red from another clone.
+
+## 2026-09-23 5d48942 run-01
+
+The skip-justification gate and the conditional skip stop colliding.
+
+**Changed:**
+
+- **A second justified form on the gate.** `build/InContainer.Test.ps1` and
+  `Assert-SuiteClean` in `build/tasks/Test.build.ps1` tolerated a skipped test
+  only if it carried a `BLOCKER-n` tag. They now also accept
+  `SkipWhen:<kebab-reason>`, matched by
+  `^SkipWhen:(?<reason>[a-z0-9]+(-[a-z0-9]+)*)$`. Both forms are read off the
+  Pester test object — its own tags plus every parent block's — so the
+  justification is a thing the gate measures rather than a comment nobody
+  executes.
+- **Why not `BLOCKER-n`.** A blocker is a defect someone intends to repair and
+  strike, and this repository is retiring them (seq 9, `blocker-1-retired`).
+  "No exempt commit in range" is not a defect. It is a state this tree is in on
+  most days and will re-enter whenever the pull-request range holds no
+  grandfathered commit, so filing it as a blocker would mean carrying it on the
+  standing list forever for something nobody plans to leave.
+- **The two tests are tagged, not excused.** `tests/Trailers.Tests.ps1` — the
+  Co-Authored-By falsification and the empty-exemption-list falsification —
+  each carry `-Tag 'SkipWhen:no-exempt-commit-in-range'` beside the existing
+  `-Skip:$NothingToFalsify` from `47e2031`. The tag is on the two `It`s and not
+  on the `Describe`, because the sibling "passes, using the exemption" does not
+  skip and must not inherit a justification it never needed.
+- **The gates now report WHY.** Both print justified skips grouped by reason.
+  `output/incontainer.json` gains `justified_skips[]`, each entry carrying
+  `test`, `result` and `reason`; `unjustified_skips` keeps its meaning and is
+  now empty. A green log that says "skipped: 2" tells a reader nothing they can
+  act on.
+- **The rule is written once.** `Get-SkipJustification` lives in
+  `build/Build.Helpers.psm1` — plain PowerShell, no Invoke-Build dependency,
+  which is why the container can import it from the `/work` bind mount. The two
+  gates remain two implementations and still differ on `NotRun`: the container
+  run carries an `ExcludeTag` filter and the host run does not. They no longer
+  differ on what a justification *is*.
+
+**Tested:** passed=150 failed=0 skipped=2 — in-container, `pwsh 7.6.6`,
+Pester 6.1.0, uid 1001, 21 Docker-tagged tests `NotRun` by design and excluded
+from both skip lists. Host `Test.Unit`: passed=171 failed=0 skipped=2
+NotRun=0 Inconclusive=0. Before this change both runs were exit 1 on those same
+numbers; only the verdict on the two skips moved.
+
+**Failed:** none.
+
+**Missing:**
+
+- The gate is still not in the CI required set. That is I7, explicitly out of
+  scope here, so `config/repo.json -> required_checks` is untouched.
+- `scripts/state.ps1` still refuses to run in this repository — it asserts the
+  origin is `claude.pwsh.image.builder` and exits 1. Every state block in this
+  run, including the one in the pull request, is hand-assembled. Listed, not
+  fixed.
+- `scripts/ci/Test-PushGuard.ps1:44` names `config/trailer-grandfather.txt` in
+  its doc comment; the file is at `.continuity/trailer-grandfather.txt`. A
+  stale path in prose, no behaviour attached. Listed, not fixed.
+- `docs/plans/ACTIVE.md` still describes `feature/env-local` from 2026-09-21,
+  two features ago. `AGENTS.md`'s stale-plan STOP is recorded as SUSPENDED in
+  the disagreement table on the grounds that the file does not exist; it does
+  exist. Listed, not fixed — deciding it is not this run's job.
+
+**Blockers:**
+
+- **No signing key.** Not touched. Nothing signs anything; `actor` and
+  `LEDGER_PRINCIPAL` are operator-asserted and are places to be caught lying,
+  not signatures.
+- **Command-hook timeout fails open.** Not touched. The 15s PreToolUse timeout
+  is Claude Code semantics; a sentinel that hangs is a sentinel that is not
+  consulted.
+- The receipt-append export blocker was struck on 2026-09-23 at seq 9 and is
+  not relisted; see the 2026-09-21 section for its history.
+
+**Ledger head hash:** `ade4061216bd49047c169c95b23ae0eb4b508114c19180ae1a622d5204f6b3ea`
+(3 receipts at `output/ledger/ledger.jsonl`, written by the sentinel baked into
+the image and verified by `Get-LedgerVerify`. It moves on every
+`Test.InContainer` — receipts accumulate by design — so `Goal.Update` checks
+its shape, not its value.)
+
+**Assessment hash:** `798b10ee3ca2d64b28bc779611484ddc0565448c6468ae2ddaf54a53a98030a3`
+— canonical sha256 of `prompts/assessment.2026-09-21.json`, unchanged by this
+run and re-verified by `Bootstrap`.
+
+**Forensic chain:** the decision was recorded *before* the edit, at seq 10,
+`kind=decision`, `subject=skip-justification-form`, `prev f05b175d`,
+`self f88886e6`. `Goal.Update` appends its own `verification` record at the end
+of this run, so this run adds two records, not one.
+
+**Falsified, because a gate that only ever says yes is the honour system with
+extra steps.** A scratch untracked `tests/Scratch.Falsify.Tests.ps1` carrying
+one skip with no tag and one tagged `SkipWhen:NotAKebabReason` — a spelling the
+pattern rejects — drove both gates red: `Test.Unit` exit 1 and
+`Test.InContainer` exit 1, each naming both scratch skips while still reporting
+the two real ones as justified. skipped=4 in both runs. The scratch was then
+removed and the tree verified clean.
+
 ## 2026-09-21 06e738d run-01
 
 Getting the image from "a hook exists" to "the hook is proven".
@@ -82,14 +369,17 @@ Test.InContainer` → `Build succeeded. 5 tasks, 0 errors, 0 warnings`.
 
 **Blockers:**
 
-- **BLOCKER-1 — the Ledger does not export a receipt-append function.**
-  `Get-LedgerVerify` *is* exported, so the entrypoint's chain check is live and
-  needs no `-WhatIf` guard. `Add-LedgerRecord` exists at `Ledger.psm1:298` but
-  is absent from `Export-ModuleMember` at `Ledger.psm1:1121`, so the sentinel
-  reaches it through the module's own session state. That is a coupling to a
-  private name. The fix belongs in `claude.build.ledger`;
-  `tests/Sentinel.Tests.ps1` carries a tripwire so the breakage is loud rather
-  than appearing in production as "ledger write failed" on every hook call.
+- **The receipt-append export — RETIRED 2026-09-23, and listed here as history.**
+  At the time of this run the Ledger exported no receipt-append function:
+  `Add-LedgerRecord` existed at `Ledger.psm1:298` but was absent from
+  `Export-ModuleMember` at `Ledger.psm1:1121`, so the sentinel reached it
+  through the module's own session state — a coupling to a private name.
+  `Get-LedgerVerify` *was* exported even then, so the entrypoint's chain check
+  was live and needed no `-WhatIf` guard. The fix landed upstream: at vendor pin
+  `a68664e` the name is exported by both `ledger.psd1:9` and
+  `ledger.psm1:1121-1122`, `hooks/sentinel.ps1` calls it plainly, and
+  `tests/Sentinel.Tests.ps1` asserts the export rather than the workaround.
+  Retirement recorded on the forensic chain at seq 9, `blocker-1-retired`.
 - **No signing key.** Not touched, per the run order. Nothing signs anything.
 - **Command-hook timeout fails open.** Not touched, per the run order. The 15s
   PreToolUse timeout is Claude Code semantics; a sentinel that hangs is a
@@ -144,11 +434,33 @@ for the run. The second was created on `origin` by Grok and never merged.
 The content below is Grok's, moved VERBATIM and not edited. `docs/END_GOAL.md` is deleted
 in the same commit. Nothing is lost; it changes address and says whose it is.
 
-Note a claim in it that this pass has since settled: "`Add-LedgerRecord` not in
-`FunctionsToExport`. Fix in `claude.build.ledger`, then pin bump." That is BLOCKER-1, and
-the compliance plan's D7 records the objection to exporting it raw - a receipt could then
-be appended with no validated output behind it. The decision is `Add-LedgerReceipt`, a
-constrained wrapper, not the raw function.
+Note a claim in it that later passes settled: "`Add-LedgerRecord` not in
+`FunctionsToExport`. Fix in `claude.build.ledger`, then pin bump." It was true when Grok
+wrote it and it is history now - at vendor pin `a68664e` the name IS in `FunctionsToExport`
+(`ledger.psd1:9`) and the pin bump has landed. Grok's words above are left exactly as
+written; this note is where the correction lives, because editing an attributed section to
+agree with a later fact is how a record stops being one.
+
+One objection that travelled with that claim is NOT settled upstream, and is not quietly
+dropped here. The earlier text cited "the compliance plan's D7" for it: exporting the
+function raw means a receipt can be appended with no validated output behind it, so the
+decision was `Add-LedgerReceipt`, a constrained wrapper, rather than the raw function.
+**That plan file is not in this tree** - `docs/plans/` was pruned to code-named files at
+birth (forensic seq 1), and `git grep` finds no D7 here - so the citation is carried, not
+verifiable from this repository. What IS measurable, re-measured 2026-09-23 at vendor pin
+`a68664e6b9938773478d967348b590f487fe2443`: `Add-LedgerReceipt` exists in neither this tree
+nor `vendor/claude.agent.core` - `git grep` returns nothing in core, and here it returns
+only the two prose lines in this note - while core exports the raw `Add-LedgerRecord` as one
+of five names at `modules/ledger/ledger.psd1:9`.
+
+**Where it stands, decided 2026-09-23: OPEN IN CORE, CLOSED IN IMAGES.** A wrapper over a
+Ledger export is Ledger API, and this repository consumes core rather than adding to it -
+there is no place here to put an `Add-LedgerReceipt` that would not immediately belong to
+core. So the objection stops being carried as an unmet obligation of THIS tree, which is how
+the line above used to read, and is carried instead as an open objection against core at the
+pin named. No wrapper is written here and core is not touched. What this repository did change
+is smaller and is not offered as meeting the objection: the sentinel depends on a public name
+instead of a private one. Forensic chain seq 12, `tidy-before-promotion-six-items`.
 
 ## 2026-09-21 — Grok review of oneshot (this file created on origin)
 

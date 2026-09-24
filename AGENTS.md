@@ -154,8 +154,16 @@ Verify with `pwsh -NoProfile -File scripts/forensic.ps1 -Verify`, and print the
 off-tree anchor with `-Anchor`.
 
 **The blockers get listed every single run until someone decides otherwise:**
-no signing key (identity is operator-asserted), command-hook timeout fails
-open, and the Ledger's receipt-append function is not exported.
+no signing key (identity is operator-asserted), and command-hook timeout fails
+open.
+
+A third stood here until 2026-09-23 — the Ledger's receipt-append function was
+not exported, so the sentinel reached it through module session state. Someone
+decided otherwise, which is the exit this rule already provides for. At vendor
+pin `a68664e` the function is exported (`ledger.psd1:9`,
+`ledger.psm1:1121-1122`) and `hooks/sentinel.ps1` calls it plainly. It is struck
+from the standing list rather than relisted; the retirement is on the forensic
+chain at seq 9, `blocker-1-retired`.
 
 ### Breadcrumbs for the other two (Claude + Fable)
 - This build surface is NEW. Claude (Opus 5) and Fable (5.1) should pick up the plan contract, the fail-first discipline, and the snake integration from here.
@@ -181,7 +189,7 @@ number is given where one exists.
 | # | The disagreement | Governs today |
 |---|---|---|
 | 1 | The preamble says read `.ALLAGENTS.md`, then `FLOW.md`, and never transcribe state — run `scripts/state.ps1`. **None of those three files exist on this lineage.** | **SUSPENDED.** An instruction naming an absent file is unfollowable, not strict. It stays written down because deleting it would hide that `develop`'s CI still requires all three (FINDING-M4). Either the files come back or the rule goes — that is a decision, not a merge. |
-| 2 | Plan rules require `docs/plans/ACTIVE.md`, say to **STOP** if it is missing, and end with "No plan file = no commit". `ACTIVE.md` does not exist here. | **SUSPENDED**, same reason. Taken literally it forbids every commit in this repository, including this one. The run order in `docs/plans/2026-09-21-cleanup/` is the plan that governs this pass. |
+| 2 | Plan rules require `docs/plans/ACTIVE.md`, say to **STOP** if it is missing, and end with "No plan file = no commit". This row used to end `ACTIVE.md` does not exist here, and that was false from the birth commit `f1aeb60` onward - the file arrived with the birth, naming `feature/env-local`. | **REINSTATED 2026-09-23, with a reading.** No `ACTIVE.md` means no active plan, and that is a legal state: the **STOP** fires only when the file EXISTS and names a branch other than the one you are on. `ACTIVE.md` is deleted in the same commit as this row, so the STOP is quiet today rather than suspended, and the next plan drafted into that path arms it again. What the suspension was covering: four merged pull requests each edited this tree while `ACTIVE.md` named `feature/env-local` and `HEAD` did not - #1 `b03aa76`, #2 `66a78d6`, #3 `3e47c9e`, #4 `bcd8fa4`. `scripts/snake.ps1:590-592` already read the rule this way; `scripts/state.ps1` is corrected to it here. The Plan rules prose at lines 24-31 and `FLOW.md` lines 187-188 still say STOP-if-missing and are NOT edited: this table is where the reading lives, which is the whole point of listing disagreements instead of silently reconciling them. |
 | 3 | The oneshot side names `.agent/TRAPS.md`, `.agent/EXECUTION.md`, `docs/DECISIONS/` and `docs/OPEN-QUESTIONS.md`. None exist. (F-29) | **SUSPENDED.** Same class, other side. Neither lineage gets to pretend its missing files are only the other one's problem. |
 | 4 | `## Do not` forbids `LEDGER_HOOK_ARM`; `README.md`'s `docker run` example passes `LEDGER_HOOK_ARM=1`, and nothing in this repo reads it. (F-27) | **The prohibition governs.** The README is wrong and is rebuilt later in this pass. |
 | 5 | `No Co-Authored-By trailers` appears only on the develop side. | **It governs**, on both. The stricter rule wins, and it is the one this repo's CI can actually check. Every commit carries `who: <actor>` as its last line instead. |

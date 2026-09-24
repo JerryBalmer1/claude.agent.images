@@ -19,3 +19,16 @@ docs/POLICY.md text eol=lf
 # Consumed by git INSIDE the container as GIT_CONFIG_GLOBAL, off the bind mount, so it must not
 # arrive carrying CRLF from a Windows checkout.
 build/container.gitconfig text eol=lf
+
+# THE FORENSIC CHAIN. LF, for the same reason the generated files above are LF, but with a
+# sharper failure: `self` is a sha256 over the record, and the file is the only copy of the
+# history it attests to.
+#
+# Measured on a cold clone of f1aeb60 on Windows: this file checks out at 534 bytes with one
+# CRLF pair, against 533 bytes and none in a worktree that had never been re-checked-out. The
+# parser trims, so `-Verify` returned OK on both - the conversion is SILENT, which is worse
+# than a loud break. It means the bytes on one clone are not the bytes on another while both
+# report the same tip, and an anchor is only worth what the bytes under it are.
+#
+# `-Append` writes LF. Under `* text=auto` a Windows checkout was free to hand it back CRLF.
+.continuity/forensic.jsonl text eol=lf

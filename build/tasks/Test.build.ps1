@@ -31,6 +31,10 @@ task Test.Unit {
     Write-Build Cyan ("Host: passed={0} failed={1} skipped={2}" -f
         $result.PassedCount, $result.FailedCount, $result.SkippedCount)
 
+    # Assert-SuiteClean lives in build/Build.Helpers.psm1, imported by .build.ps1, because
+    # scripts/ci/Invoke-Tests.ps1 calls it too - it used to be a function in this file and
+    # therefore unreachable from a plain pwsh script. No -ExcludeTag: this run excludes
+    # nothing, so every NotRun it sees really is unexplained.
     Assert-SuiteClean -Result $result -Where 'host'
 }
 
@@ -92,54 +96,27 @@ task Test.InContainer Build.Image, {
         $summary.ps_version, $summary.pester_version, $summary.uid)
     Write-Build Cyan ("Ledger head: {0}" -f $summary.ledger_head)
 
+    # The container gate already decided which skips were justified; this end reports
+    # them, so the reason survives into the host log rather than only into the JSON.
+    # Guarded: a summary written before justified_skips existed is still readable, and
+    # StrictMode would otherwise turn an old artefact into a parse error.
+    $justified = @()
+    if ($summary.PSObject.Properties.Name -contains 'justified_skips') {
+        $justified = @($summary.justified_skips)
+    }
+    foreach ($group in ($justified | Group-Object -Property reason | Sort-Object -Property Name)) {
+        Write-Build Yellow ("Container: skipped — $($group.Name):")
+        foreach ($t in $group.Group) { Write-Build DarkGray "    $($t.test)" }
+    }
+
     if ($summary.uid -eq '0') { throw 'the in-container suite ran as root; it proves nothing about the leash' }
     if ($summary.failed -gt 0) { throw "$($summary.failed) test(s) failed inside the container" }
     if (@($summary.unjustified_skips).Count -gt 0) {
-        throw ("skipped without a BLOCKER-n tag: " + (@($summary.unjustified_skips) -join ', '))
+        throw ("no justification tag (BLOCKER-n or SkipWhen:<reason>) on: " +
+            (@($summary.unjustified_skips) -join ', '))
     }
     if ($summary.passed -eq 0) { throw 'no tests ran inside the container; that is a failure, not a pass' }
 
     Write-Build Green 'Test.InContainer: green.'
 }
 
-function Assert-SuiteClean {
-    <#
-    .SYNOPSIS
-        Fail on any failed test, and on any skip that does not name a blocker.
-    #>
-    param(
-        [Parameter(Mandatory)]$Result,
-        [Parameter(Mandatory)][string]$Where
-    )
-
-    if ($Result.FailedCount -gt 0) {
-        $names = @($Result.Tests | Where-Object Result -eq 'Failed' | ForEach-Object { $_.ExpandedPath })
-        # ${Where} and not $Where: a colon straight after a variable name makes
-        # PowerShell read it as a scope qualifier, the way $script: does, and
-        # the file will not even parse.
-        throw ("${Where}: $($Result.FailedCount) test(s) failed:`n  " + ($names -join "`n  "))
-    }
-
-    # 'NotRun' is how Pester reports a test excluded by a tag filter, which is
-    # not a skip and must not be counted as one. Test.Unit excludes nothing, so
-    # any NotRun here really is unexplained.
-    $unjustified = @(
-        $Result.Tests | Where-Object {
-            $tags = @($_.Tag)
-            $block = $_.Block
-            while ($block) { $tags += @($block.Tag); $block = $block.Parent }
-            $hasBlocker = [bool](@($tags) | Where-Object { $_ -match '^BLOCKER-\d+$' })
-
-            ($_.Result -eq 'Skipped' -and -not $hasBlocker) -or
-            ($_.Result -in @('Inconclusive', 'NotRun'))
-        }
-    )
-    if ($unjustified.Count -gt 0) {
-        throw ("${Where}: skipped without a BLOCKER-n tag:`n  " +
-            (@($unjustified | ForEach-Object { $_.ExpandedPath }) -join "`n  "))
-    }
-
-    if ($Result.PassedCount -eq 0) {
-        throw "${Where}: no tests ran; that is a failure, not a pass"
-    }
-}

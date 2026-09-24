@@ -5,7 +5,9 @@
 #   origin file   : scripts/ci/Test-PushGuard.ps1
 #   origin commit : 912c1c9eb48ab0b639d257bc7b10661d7212f985
 #   origin sha256 : 7847e71292e63d1c4753adca8369245dfde42e5c8a20320b85b917c0855076d3
-#   adapted here  : no - byte-identical at copy time
+#   adapted here  : YES - one path in the .DESCRIPTION, 2026-09-23. The grandfather file
+#                   lives at .continuity/trailer-grandfather.txt here, not config/. No
+#                   behaviour differs: this script never reads it. Byte-identical otherwise.
 #
 # There is no submodule here and substrate does not follow this copy. If substrate's
 # version moves, this one does not move with it. Diff the two against the origin commit
@@ -41,7 +43,7 @@
        `who: claude` into every merge commit body it creates, so a merge commit without one was
        not made by the automation either.
 
-    The grandfather file is DELIBERATELY NOT CONSULTED. config/trailer-grandfather.txt exempts
+    The grandfather file is DELIBERATELY NOT CONSULTED. .continuity/trailer-grandfather.txt exempts
     commits inherited from before the guard existed, which is a statement about history. This
     script judges an event happening now. Sharing the list would let an old hash excuse a new
     push, and the exemption would quietly become a skeleton key.

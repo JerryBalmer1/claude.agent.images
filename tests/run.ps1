@@ -24,7 +24,7 @@ $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
 
 $repoRoot = (git rev-parse --show-toplevel)
-if ($repoRoot -notmatch 'claude\.pwsh\.image\.builder$') { throw 'NOT IN IMAGE BUILDER' }
+if ($repoRoot -notmatch 'claude\.agent\.images$') { throw 'NOT IN CLAUDE.AGENT.IMAGES' }
 Set-Location -LiteralPath $repoRoot
 
 if (-not $Path) { $Path = Join-Path $repoRoot 'tests' }

@@ -79,15 +79,15 @@ $excludeTag = @('Docker')
 # not perform and why. Degrading visibly beats either a red build nobody can fix without a
 # credential, or a green one that quietly proved less than it claims.
 #
-# The real fix is a PAT with read access to claude.agent.substrate, stored as a repository secret
+# The real fix is a PAT with read access to claude.agent.core, stored as a repository secret
 # and passed to actions/checkout as `token:`. That is Jerry's to create. FINDING-M17.
-$ledgerManifest = Join-Path $RepoRoot 'vendor/claude.agent.substrate/modules/ledger/ledger.psd1'
+$ledgerManifest = Join-Path $RepoRoot 'vendor/claude.agent.core/modules/ledger/ledger.psd1'
 if (-not (Test-Path -LiteralPath $ledgerManifest)) {
     $excludeTag += 'Ledger'
     Write-Host ''
     Write-Host 'pester: WARNING -- the vendored Ledger module is NOT present.'
     Write-Host "pester:   expected  $ledgerManifest"
-    Write-Host 'pester:   cause     vendor/claude.agent.substrate is a private submodule and the'
+    Write-Host 'pester:   cause     vendor/claude.agent.core is a private submodule and the'
     Write-Host 'pester:             workflow GITHUB_TOKEN cannot clone another repository.'
     Write-Host 'pester:   effect    every Ledger-tagged test is EXCLUDED from this run.'
     Write-Host 'pester:   fix       a PAT with read access, as a repo secret, passed to'
@@ -114,9 +114,33 @@ if ($result.TotalCount -eq 0) {
     Write-Host 'pester: FAIL -- the suite ran zero tests; an empty suite is not a green'
     exit 1
 }
-if ($result.FailedCount -gt 0) {
-    Write-Host "pester: FAIL -- $($result.FailedCount) test(s) failed"
+
+# THE FLOOR, NOT THE CEILING: this makes CI red on an unjustified skip, exactly as
+# Invoke-Build Test.Unit is; it does NOT make CI prove what Test.InContainer proves.
+#
+# Until this call existed, the only conditions above were "zero tests" and "a failed test",
+# so a skipped test with no justification tag went GREEN here while the same tree went red
+# under Invoke-Build. A required check that passes what the build fails is not a gate.
+#
+# Assert-SuiteClean is the SAME function Test.Unit calls, from build/Build.Helpers.psm1 -
+# not a port of it. The excluded tags are passed in because Pester reports a tag-excluded
+# test as NotRun, and on a runner that is most of the suite: the Ledger-tagged tests are
+# excluded above for want of a PAT (FINDING-M17) and the Docker-tagged ones by design. A
+# NotRun the filter explains is tolerated; a skip with no reason on the test object is not.
+$helpers = Join-Path $RepoRoot 'build/Build.Helpers.psm1'
+Import-Module $helpers -Force -ErrorAction Stop
+
+try {
+    Assert-SuiteClean -Result $result -Where 'pester' -ExcludeTag $excludeTag
+}
+catch {
+    # The message already names the check and every offending test, so it is printed as
+    # thrown rather than wrapped - "pester: FAIL -- pester: ..." reads like a bug.
+    Write-Host ''
+    Write-Host $_.Exception.Message
+    Write-Host 'pester: FAIL'
     exit 1
 }
+
 Write-Host 'pester: PASS'
 exit 0

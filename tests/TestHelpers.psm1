@@ -222,7 +222,7 @@ function Get-LedgerManifestPath {
     [CmdletBinding()]
     [OutputType([string])]
     param()
-    return Join-Path (Get-RepoRoot) 'vendor' 'claude.agent.substrate' 'modules' 'ledger' 'ledger.psd1'
+    return Join-Path (Get-RepoRoot) 'vendor' 'claude.agent.core' 'modules' 'ledger' 'ledger.psd1'
 }
 
 function ConvertFrom-JsonSafe {

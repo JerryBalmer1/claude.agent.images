@@ -28,8 +28,6 @@ param(
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
 
-$script:ExpectedRepo = 'claude.pwsh.image.builder'
-
 function Invoke-Tolerant {
     <#  Native commands throw under $PSNativeCommandUseErrorActionPreference. For
         probes where "it failed" is a legitimate answer, that has to be caught. #>
@@ -81,7 +79,7 @@ function Write-Section {
 }
 
 # --------------------------------------------------------------------------
-# guard: right repo, or nothing
+# guard: the work tree this script BELONGS to, or nothing
 # --------------------------------------------------------------------------
 
 $root = Invoke-Tolerant -Command { git rev-parse --show-toplevel } -Fallback $null
@@ -92,11 +90,34 @@ if (-not $root) {
 }
 $root = ([string]$root).Trim()
 
-$origin = Invoke-Tolerant -Command { git remote get-url origin } -Fallback ''
-if (([string]$origin) -notlike "*$script:ExpectedRepo*") {
-    Write-Host "state: wrong repository."
-    Write-Host "state: expected a clone of $script:ExpectedRepo, found origin = $origin"
-    Write-Host "state: see FLOW.md section 1 for the correct path."
+# THE ORIGIN IS READ, NEVER ASSERTED AGAINST A NAME. This guard was pinned to
+# the literal 'claude.pwsh.image.builder' and therefore exited 1 in
+# claude.agent.images, the repository it was carried into at birth - so every
+# state block here was hand-assembled instead, which is the exact failure the
+# script exists to prevent. Replacing one hardcoded name with two would just
+# reschedule that bug for the next birth.
+#
+# What is asserted instead is the property that makes the report trustworthy: the
+# work tree being reported on is the work tree THIS COPY of the script lives in.
+# Run from inside another clone, it says so, rather than quietly printing that
+# clone's branches under this one's name. Compared as resolved full paths, because
+# git answers with forward slashes on Windows and a string compare would fail on
+# the separator alone.
+$origin = ([string](Invoke-Tolerant -Command { git remote get-url origin } -Fallback '')).Trim()
+
+$scriptRoot = Invoke-Tolerant -Command { git -C $PSScriptRoot rev-parse --show-toplevel } -Fallback $null
+if (-not $scriptRoot) {
+    Write-Host 'state: this script is not itself inside a git work tree.'
+    Write-Host "state: script at $PSScriptRoot - see FLOW.md section 1."
+    exit 1
+}
+$scriptRoot = ([string]$scriptRoot).Trim()
+
+if ([System.IO.Path]::GetFullPath($root) -ne [System.IO.Path]::GetFullPath($scriptRoot)) {
+    Write-Host 'state: wrong work tree.'
+    Write-Host "state: reporting on    $root  (origin = $origin)"
+    Write-Host "state: script lives in $scriptRoot"
+    Write-Host 'state: cd into the clone this script belongs to - see FLOW.md section 1.'
     exit 1
 }
 
@@ -114,7 +135,7 @@ $gh = Get-Command gh -ErrorAction SilentlyContinue
 Write-Host '=== LIVE STATE - generated, do not hand-edit ==='
 Write-Host ("generated:    {0}" -f (Get-Date).ToString('yyyy-MM-dd HH:mm:ss K'))
 Write-Host ("repo root:    {0}" -f $root)
-Write-Host ("origin:       {0}" -f ([string]$origin).Trim())
+Write-Host ("origin:       {0}" -f $origin)
 if ($NoFetch) { Write-Host 'WARNING:      -NoFetch used, remote values may be stale' }
 
 Write-Section 'branch'
@@ -248,8 +269,9 @@ else {
 Write-Section 'active plan'
 $active = Join-Path $root 'docs/plans/ACTIVE.md'
 if (-not (Test-Path -LiteralPath $active)) {
-    Write-Host 'docs/plans/ACTIVE.md: ABSENT'
-    Write-Host '              no plan = no commit. Write one, or run snake.ps1 -NextPlan.'
+    Write-Host 'docs/plans/ACTIVE.md: ABSENT - no active plan, a legal state'
+    Write-Host '              AGENTS.md disagreement row 2: the STOP fires only when the'
+    Write-Host '              file EXISTS and names another branch. snake.ps1 -NextPlan drafts one.'
 }
 else {
     $planBranch = (Select-String -Path $active -Pattern '^Branch:\s*(.+)$' | Select-Object -First 1)
