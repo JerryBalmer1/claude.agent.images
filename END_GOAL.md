@@ -10,6 +10,45 @@ fails the build rather than being believed.
 
 ---
 
+## 2026-09-23 4290102 run-01
+
+I12, after the promotion, `feature/ci-on-main-self-run`: the ci-on-main check from PR 3 was
+self-referential, and this fixes it.
+
+**Changed:**
+
+- `tests/CiOnMain.Tests.ps1`: the live claim measures the packet's word, *completed*. Inside the ci run
+  for main's tip, that run (`GITHUB_RUN_ID`) is the evidence. `AGENTS.md` wording follows.
+
+**Tested:** passed=188 failed=0 skipped=6 - in-container, `pwsh 7.6.6`, Pester 6.1.0, uid 1001,
+`unjustified_skips` empty. Host: the live check passes and reports `bc7b64c`, 1 completed ci run,
+conclusion failure.
+
+**Failed:** none in this tree. **On main:** `bc7b64c`'s only ci run, 35957396113 (dispatched by hand,
+by claude), failed on the defective check this fixes. `main` keeps that copy of the test until the
+next promotion.
+
+**Missing:**
+
+- The in-run branch runs only on a runner, so its first real exercise is the next promotion's
+  automerge dispatch.
+- `bc7b64c` has no successful ci run, and none is manufactured.
+
+**Blockers:**
+
+- **No signing key.** Not touched. Identity is operator-asserted.
+- **Command-hook timeout fails open.** Not touched. 15s PreToolUse, Claude Code semantics.
+- The receipt-append export blocker was struck on 2026-09-23 at seq 9 and is not relisted.
+
+**Ledger head hash:** `33a77e42c7a9f230735561fdbcd3abe28df294abb4d92671b0bffde536bd123a`
+(shape checked, not value.)
+
+**Assessment hash:** `798b10ee3ca2d64b28bc779611484ddc0565448c6468ae2ddaf54a53a98030a3`
+- canonical sha256 of `prompts/assessment.2026-09-21.json`, unchanged and re-verified by `Bootstrap`.
+
+**Forensic chain:** confession at seq 42 (`ci-on-main-test-self-referential`). `Goal.Update` appends
+its own `verification` record.
+
 ## 2026-09-23 6ab3298 run-01
 
 I12 PR 5, `feature/ledger-receipt-caller`: `src/LedgerReceipt.ps1` is deleted. It shipped in both
