@@ -10,6 +10,49 @@ fails the build rather than being believed.
 
 ---
 
+## 2026-09-23 756b356 run-01
+
+I13 PR 2, `feature/root-cause-23b1db9`: what corrupted `END_GOAL.md` in `23b1db9` is named, reproduced, and
+refused at edit time.
+
+**Changed:**
+
+- Root cause, from the I12 session transcript: the inline edit held its one pair as `@( @('<old>','<new>') )`.
+  `@()` unrolls the inner array, so the loop indexed characters and replaced every backtick with `j`,
+  then every `a` with a space. Reproduced on `23b1db9~1`'s blob `b017750`: the result is blob `54901e2`,
+  which is `23b1db9`'s, byte for byte.
+- `scripts/Edit-Text.ps1`: parallel `-Old`/`-New`, each old string exactly once, and the declared line
+  diff is checked before writing. `tests/ScriptedEdit.Tests.ps1`, 8 cases.
+- `DECISIONS.md` names the bug. `FINDINGS.md` is new, with I13-F1. Sites in the tree using the pattern:
+  none.
+
+**Tested:** passed=204 failed=0 skipped=6 - in-container, `pwsh 7.6.6`, Pester 6.1.0, uid 1001,
+wall 39.34s, `not_loaded` empty, `unjustified_skips` empty. Host: 229 / 0 / 2.
+
+**Failed:** none.
+
+**Missing:**
+
+- The packet's suspect list was not worked through, because the transcript named the command. None of
+  the four was the cause.
+- `Edit-Text.ps1` guards edits made through it. It cannot stop an inline loop someone writes instead.
+  `EndGoalIntegrity.Tests.ps1` stays as the after-the-fact net for this file.
+
+**Blockers:**
+
+- **No signing key.** Not touched. Identity is operator-asserted.
+- **Command-hook timeout fails open.** Not touched. 15s PreToolUse, Claude Code semantics.
+- The receipt-append export blocker was struck on 2026-09-23 at seq 9 and is not relisted.
+
+**Ledger head hash:** `3328b363b268fe26e933bd6d5ca51d0e7ad2a89fe155a55891d4b5549c882f97`
+(shape checked, not value.)
+
+**Assessment hash:** `798b10ee3ca2d64b28bc779611484ddc0565448c6468ae2ddaf54a53a98030a3`
+- canonical sha256 of `prompts/assessment.2026-09-21.json`, unchanged and re-verified by `Bootstrap`.
+
+**Forensic chain:** finding at seq 46 (`end-goal-23b1db9-root-cause`). `Goal.Update` appends its own
+`verification` record.
+
 ## 2026-09-23 fa19d1f run-01
 
 I13 PR 1, `feature/runner-traps`: every test gate fails on a test file that fails to load, and

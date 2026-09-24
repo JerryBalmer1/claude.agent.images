@@ -3,6 +3,44 @@
 Decisions that change what this repository keeps, and why. Each one points at the forensic record
 that carries its evidence. Newest first.
 
+## 2026-09-24 - 23b1db9: a one-pair edit list unrolled into two one-character replacements
+
+**Context.** `23b1db9` (I12 PR 1) meant to change one line of `END_GOAL.md` and changed 658: every `a`
+became a space and every backtick became `j`. #21 repaired the file and said how it happened was not
+established. It is now. The edit was one inline pwsh command, found in the I12 session transcript two
+minutes before the commit. Its entry for this file was
+
+```powershell
+@{ F = 'END_GOAL.md'; P = @( @('<old>', '<new>') ) }
+```
+
+**The bug.** PowerShell's array subexpression operator `@()` unrolls an array it contains, so
+`@( @(a, b) )` is `@(a, b)`. `P` held two strings, not one pair. `foreach ($p in $e.P)` walked the
+strings, and `$p[0]`, `$p[1]` indexed characters. The first string begins with a backtick followed by
+`j`, and the second begins with `a` followed by a space. So the loop replaced every backtick with `j`,
+then every `a` with a space. The anchor check `Contains($p[0])` passed, because a single character is almost
+always present. Every other file in the same command had two or more pairs, which stay pairs. That is
+why only `END_GOAL.md` was damaged, which #21 had measured without knowing why.
+
+**Reproduced, not inferred.** The exact entry and loop, run in a temp folder on `23b1db9~1`'s blob
+`b017750`, produce blob `54901e2`, which is `23b1db9`'s blob, byte for byte (658 lines changed, 658 removed).
+Of the packet's suspects, this is closest to "char arithmetic in a loop". No cast was written, though:
+the characters came from indexing a string the author believed was a pair. No `-replace` pattern,
+encoding or CRLF handling was involved.
+
+**Decision.** A scripted edit to a tracked text file goes through `scripts/Edit-Text.ps1`. It takes
+parallel `-Old` and `-New` arrays, so there is no pair shape to unroll. Every old string must occur
+exactly once. The line diff is measured on a copy, printed, and compared with the caller's declared
+`-ExpectAdded` / `-ExpectDeleted` before anything is written. `tests/ScriptedEdit.Tests.ps1` pins the
+reproduction and shows the tool refusing `23b1db9`'s inputs. Where a literal holding one pair is
+really needed, it is written `@( ,@(a, b) )`.
+
+**Retired from the tree: no sites.** The pattern lived only in that inline command. Every tracked
+`.ps1` and `.psm1` was searched for pair indexing. `scripts/Generate-Policy.ps1:112,211` and
+`scripts/ci/Test-BranchFlow.ps1:48,52,61` index `$config.flow` rows from `ConvertFrom-Json`, where a
+one-row array stays a row (measured). `scripts/Invoke-AutoMerge.ps1:140` indexes a `-split` result.
+None is a nested literal, and none edits a file. `FINDINGS.md` I13-F1. Forensic chain seq 46.
+
 ## 2026-09-24 - src/LedgerReceipt.ps1 deleted: shipped in both images, called by nothing
 
 **Context.** Both images copy `src/` into `/opt/leash/src/`. `src/LedgerReceipt.ps1` defined
