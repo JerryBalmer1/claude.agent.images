@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/JerryBalmer1/claude.pwsh.image.builder/schemas/repo.schema.json",
+  "$id": "https://github.com/JerryBalmer1/claude.agent.images/schemas/repo.schema.json",
   "title": "claude.agent.repo/1",
   "description": "The single source of truth for this repo's branch names, merge strategy, review mode, required checks and script version floor. Everything docs/POLICY.md and the PR template say is rendered from here.",
   "type": "object",

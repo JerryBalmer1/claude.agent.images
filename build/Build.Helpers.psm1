@@ -2,7 +2,7 @@
 
 <#
 .SYNOPSIS
-    Shared helpers for the claude.pwsh.image.builder build surface.
+    Shared helpers for the claude.agent.images build surface.
 
 .DESCRIPTION
     Task bodies in build/tasks/*.build.ps1 orchestrate and render. The work

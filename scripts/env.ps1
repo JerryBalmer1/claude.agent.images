@@ -64,7 +64,7 @@ $PSNativeCommandUseErrorActionPreference = $true
 # named anything else - a clone into a different folder, a worktree, and in particular the
 # container, where the repository is bind-mounted at /work; that threw 'NOT IN IMAGE BUILDER'
 # out of twelve in-container tests. And it ACCEPTED any tree at all, as long as someone had
-# named the directory `claude.pwsh.image.builder`. For a script that goes looking for a file
+# named the directory after the repository this one was copied from. For a script that goes looking for a file
 # of credentials, "the folder has the right name" is not an identity check.
 #
 # $PSScriptRoot/.. is this script's own repository by construction, whatever the directory is
@@ -72,7 +72,7 @@ $PSNativeCommandUseErrorActionPreference = $true
 # docstring names this exact case.
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 if (-not (Test-Path -LiteralPath (Join-Path $repoRoot '.env.example'))) {
-    throw "not a claude.pwsh.image.builder tree: no .env.example at $repoRoot"
+    throw "not a claude.agent.images tree: no .env.example at $repoRoot"
 }
 
 if ($ListRequired) {

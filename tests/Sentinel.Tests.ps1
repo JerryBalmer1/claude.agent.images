@@ -233,3 +233,49 @@ Describe 'Sentinel: fails closed' -Tag 'Ledger' {
         $script:Box.LedgerPath | Should -Not -Exist -Because 'a payload it could not parse is not a decision it made'
     }
 }
+
+Describe 'One-element JSON array: one trap, met two ways' {
+    # A RECURRENCE, recorded as one. Same class, same repository, twice: a PowerShell
+    # pipeline unrolls a one-element JSON array into its element, so `[{...}]` arrives as a
+    # perfectly good object. hooks/sentinel.ps1 met it first and defends with a raw-text
+    # StartsWith('{') check at :119, before the bare ConvertFrom-Json at :125.
+    # .claude/hooks/Deny-Heredoc.ps1 met it second - its first version DENIED the array while
+    # its own comment claimed fail-open - and defends with -NoEnumerate at :67.
+    #
+    # Two defences, not one fix twice, and the intended verdicts are OPPOSITE on purpose: the
+    # sentinel gates an agent that may be adversarial and fails CLOSED; Deny-Heredoc guards
+    # the hands of one that is trying to comply and fails OPEN. This asserts each script's
+    # own verdict, so removing either defence turns it red. Forensic chain seq 19.
+    #
+    # Untagged, so it runs everywhere: the sentinel refuses the array before it ever imports
+    # the Ledger module, and Deny-Heredoc never loads it.
+    It 'the sentinel fails closed and Deny-Heredoc fails open on [{...}], and the control is denied' {
+        $inner = @{
+            session_id      = 'one-element-array'
+            hook_event_name = 'PreToolUse'
+            tool_name       = 'Bash'
+            tool_input      = @{ command = "cat <<EOF`nx`nEOF" }
+        } | ConvertTo-Json -Compress -Depth 5
+        $array = "[$inner]"
+        $denyHeredoc = Join-Path $script:RepoRoot '.claude' 'hooks' 'Deny-Heredoc.ps1'
+
+        $s = Invoke-LeashScript -Path $script:Sentinel -Arguments @('-Mode', 'Enforce') -Stdin $array -Environment @{
+            LEASH_LEDGER_PATH   = (Join-Path ([System.IO.Path]::GetTempPath()) 'never-written' 'ledger.jsonl')
+            LEASH_LEDGER_MODULE = $script:LedgerModule
+            LEDGER_PRINCIPAL    = 'one-element-array'
+        }
+        $s.ExitCode | Should -Be 2 -Because 'the sentinel fails closed on anything that is not a JSON object'
+        $s.StdOut | Should -BeExactly ''
+        $s.StdErr | Should -Match 'payload is not a JSON object'
+
+        $h = Invoke-LeashScript -Path $denyHeredoc -Stdin $array
+        $h.ExitCode | Should -Be 0
+        $h.StdOut | Should -BeExactly '' -Because 'Deny-Heredoc fails open on a payload that is not an object'
+
+        # The control. Without it the line above passes against a script that allows
+        # everything: the same object, unwrapped, must be denied.
+        $c = Invoke-LeashScript -Path $denyHeredoc -Stdin $inner
+        $c.ExitCode | Should -Be 0
+        (ConvertFrom-JsonSafe -Text $c.StdOut).hookSpecificOutput.permissionDecision | Should -BeExactly 'deny'
+    }
+}

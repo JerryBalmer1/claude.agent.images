@@ -59,27 +59,23 @@ jobs:
   pester:
     runs-on: ubuntu-latest
     steps:
-      # NO `submodules: recursive`, and that is not an oversight - it is blocked on a human.
+      # `submodules: recursive` fetches vendor/claude.agent.core, which carries the Ledger module
+      # the sentinel writes receipts through. core is PUBLIC, so the workflow GITHUB_TOKEN clones
+      # it with no secret and no `token:` key. With the manifest present, scripts/ci/Invoke-Tests.ps1
+      # does not exclude the `Ledger` tag and every Ledger-tagged test runs in this check.
       #
-      # This repository vendors the Ledger module as a git submodule at vendor/claude.build.ledger,
-      # and claude.build.ledger is PRIVATE. The GITHUB_TOKEN that actions/checkout uses is scoped
-      # to this repository alone, so the clone fails outright:
-      #
-      #   fatal: repository 'https://github.com/JerryBalmer1/claude.build.ledger.git/' not found
-      #   fatal: clone of '...' into submodule path 'vendor/claude.build.ledger' failed
-      #
-      # Fetching it needs a PAT with read access to that repo, stored as a repository secret and
-      # passed here as `token:`. Creating that secret is Jerry's to do, not an agent's.
-      #
-      # Until then scripts/ci/Invoke-Tests.ps1 detects the absent manifest and excludes the
-      # `Ledger` tag, printing which tests it skipped and why. It degrades VISIBLY: the run says
-      # what it did not check. See docs/plans/2026-09-21-cleanup/FINDINGS.md FINDING-M17.
+      # Until 2026-09-23 this comment said the opposite: that the submodule was
+      # vendor/claude.build.ledger, that it was private, and that fetching it needed a PAT only
+      # Jerry could create. The path was wrong from birth - the submodule has been
+      # vendor/claude.agent.core since then - and the privacy premise died when core was measured
+      # public. Forensic chain seq 19.
       #
       # fetch-depth: 0 so the suite can walk history; the trailer tests need a real graph, and a
       # shallow clone makes base..HEAD empty, which passes vacuously.
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          submodules: recursive
       - shell: pwsh
         run: ./scripts/ci/Invoke-Tests.ps1
 

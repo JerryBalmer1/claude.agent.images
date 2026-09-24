@@ -5,9 +5,10 @@
 #   origin file   : scripts/ci/Test-PushGuard.ps1
 #   origin commit : 912c1c9eb48ab0b639d257bc7b10661d7212f985
 #   origin sha256 : 7847e71292e63d1c4753adca8369245dfde42e5c8a20320b85b917c0855076d3
-#   adapted here  : YES - one path in the .DESCRIPTION, 2026-09-23. The grandfather file
-#                   lives at .continuity/trailer-grandfather.txt here, not config/. No
-#                   behaviour differs: this script never reads it. Byte-identical otherwise.
+#   adapted here  : YES - two .DESCRIPTION edits, both 2026-09-23, both comment only. The
+#                   grandfather file lives at .continuity/trailer-grandfather.txt here, not
+#                   config/; and the branch-protection premise is rewritten for a public
+#                   repository. No behaviour differs. Byte-identical otherwise.
 #
 # There is no submodule here and substrate does not follow this copy. If substrate's
 # version moves, this one does not move with it. Diff the two against the origin commit
@@ -20,11 +21,17 @@
 .DESCRIPTION
     THIS CANNOT BLOCK A PUSH, AND IT IS NOT PRETENDING TO.
 
-    Branch protection is not available on a private repository on the free tier - measured, not
-    assumed; docs/plans/2026-09-21-repo-policy/PROTECTION.md records three HTTP 403s against
-    branches/main, branches/develop and rulesets. By the time this script runs, the push has
-    already happened. What it produces is a red run, permanently attached to the commit that did
-    it, dated, with the reason written out.
+    This script runs AFTER the push, so by the time it runs the push has already happened. What
+    it produces is a red run, permanently attached to the commit that did it, dated, with the
+    reason written out.
+
+    The premise this paragraph used to rest on is gone and is corrected rather than kept: it
+    said branch protection was unavailable, from three HTTP 403s on branches/main,
+    branches/develop and rulesets. Those 403s were a private-repository limit on the free tier,
+    and this repository is public. Measured 2026-09-23: branches/main is protected by Jerry's
+    decision (PR required, force-push and deletion off, admins NOT enforced); branches/develop
+    returns 404 "Branch not protected"; rulesets returns []. So the gap this closes is narrower,
+    not closed: develop has no protection at all, and main's does not bind an admin.
 
     That is worth having because the failure it catches is not a typo, it is a report. An agent
     pushing straight to main and then saying the work went through the flow is the exact event

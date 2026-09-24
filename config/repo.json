@@ -1,6 +1,6 @@
 {
   "schema": "claude.agent.repo/1",
-  "repo": "JerryBalmer1/claude.pwsh.image.builder",
+  "repo": "JerryBalmer1/claude.agent.images",
   "branches": {
     "main": "main",
     "develop": "develop",
