@@ -10,6 +10,54 @@ fails the build rather than being believed.
 
 ---
 
+## 2026-09-23 439e2c4 run-01
+
+I11 PR B, `feature/drop-directory-guard`: `tests/run.ps1` no longer refuses on its folder name. The
+claude.agent.tools T0 inspector found the guard.
+
+**Changed:**
+
+- **The guard is gone.** `tests/run.ps1` threw `NOT IN CLAUDE.AGENT.IMAGES` unless the caller's git
+  toplevel ended in this repository's name. The root is now the folder the script lives in, as in
+  claude.agent.tools' copy.
+- **Pester is pinned from `config/repo.json`** (6.1.0), not the 5.x range. The images ship only
+  6.1.0, so this runner had never been able to run in the container on either count.
+- **`tests/RunnerFolder.Tests.ps1`.** It clones the committed HEAD into a folder named with a random
+  guid, then runs the clone's runner on a probe test from inside the clone. It was red at `3921c4b`,
+  on the host and in CI run 35950457428 (`pester` and `incontainer`, each refusing with
+  `NOT IN CLAUDE.AGENT.IMAGES`), and green from `439e2c4`.
+
+**Tested:** passed=156 failed=0 skipped=2 - in-container, `pwsh 7.6.6`, Pester 6.1.0, uid 1001,
+`unjustified_skips` empty. Host `tests/run.ps1`, now on Pester 6.1.0: 177 passed, 0 failed, 2
+skipped. Two tests added.
+
+**Failed:** none.
+
+**Missing:**
+
+- The 21 Docker-tagged tests still run nowhere in CI; in-container timing is unmeasured here. Both are
+  out of scope for I11.
+- `src/LedgerReceipt.ps1` still has no caller (see the section below).
+
+**Blockers:**
+
+- **No signing key.** Not touched. Identity is operator-asserted.
+- **Command-hook timeout fails open.** Not touched. 15s PreToolUse, Claude Code semantics.
+- The receipt-append export blocker was struck on 2026-09-23 at seq 9 and is not relisted.
+
+**Ledger head hash:** `d4e578ba8988229c2738b4ac8f3a3e2478f622ca8a745c0712dae4e29b11b3e0`
+(receipts at `output/ledger/ledger.jsonl`. It moves on every `Test.InContainer`, so
+`Goal.Update` checks its shape, not its value.)
+
+**Assessment hash:** `798b10ee3ca2d64b28bc779611484ddc0565448c6468ae2ddaf54a53a98030a3`
+- canonical sha256 of `prompts/assessment.2026-09-21.json`, unchanged and re-verified by
+`Bootstrap`.
+
+**Forensic chain:** decision recorded BEFORE any edit at seq 26, `kind=decision`,
+`subject=drop-directory-guard`, `prev 2cd6ac5d`, `self 9933bcf7`. It places the Pester import at
+`:31`; it was at `:33`, corrected in `439e2c4`'s message, record unchanged. `Goal.Update` appends its
+own `verification` record.
+
 ## 2026-09-23 6232e03 run-01
 
 I11 PR A, `feature/ledger-receipt-path`: `src/LedgerReceipt.ps1` finds claude.agent.core's ledger
