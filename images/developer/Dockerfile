@@ -106,6 +106,7 @@ RUN chown -R root:root /etc/claude-code \
     && chmod 0555 /etc/claude-code/managed-settings.json
 
 COPY hooks/ /opt/leash/hooks/
+COPY config/sentinel.json /opt/leash/config/sentinel.json
 COPY src/ /opt/leash/src/
 COPY entrypoint.ps1 /opt/leash/entrypoint.ps1
 

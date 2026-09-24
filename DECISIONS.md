@@ -3,6 +3,51 @@
 Decisions that change what this repository keeps, and why. Each one points at the forensic record
 that carries its evidence. Newest first.
 
+## 2026-09-24 - The sentinel fails closed on every path that is not an explicit allow
+
+**Context.** `hooks/sentinel.ps1` failed closed on stdin it could not parse and on a ledger it could
+not write, by exiting 2 with nothing written to the chain. It had no deadline of its own. Claude
+Code's PreToolUse hook timeout is 15 s in both `managed-settings.json` files, and a hook that
+exceeds it fails **open**, so a sentinel that hung was a sentinel that allowed. `AGENTS.md` lists
+that as a standing blocker every run.
+
+**Decision.** The only path that allows is the string `allow` from the policy step. That step is
+`hooks/policy.ps1`, which is the gated-tool rule the sentinel used to carry inline. Every other path
+is a deny body on exit 0 with a receipt whose `model` ends `/deny:<reason>`:
+
+| reason | when |
+|---|---|
+| `malformed-payload` | stdin is empty, is not a JSON object, or has no `tool_name`. The receipt names the tool `-` and hashes the raw bytes it saw |
+| `malformed-policy` | `config/sentinel.json` does not parse, lacks a key, names a policy script that is not there, has `timeout_ms` outside 1..10000, or has any `fail_mode` but `closed` |
+| `timeout` | the policy step gave no verdict within `timeout_ms` |
+| `policy-crash` | the policy step threw or wrote an error |
+| `malformed-verdict` | the policy step returned anything but exactly one `allow` or `deny`. `Allow` is not `allow` |
+| `crash` | anything else the sentinel did not foresee |
+
+A deny whose receipt can't be written is exit 2 with the reason on stderr. That covers a ledger
+that is unreachable, unmounted or unimportable, and it is the one deny with no receipt, because
+the receipt is what failed.
+
+**The timeout and the fail mode live in `config/sentinel.json`**, which both images copy to
+`/opt/leash/config/`, and `schemas/sentinel.schema.json` constrains it. The schema admits exactly
+one `fail_mode`, and the sentinel refuses any other value at runtime. `tests/SentinelConfig.Tests.ps1`
+forbids `open` as a value, not just as a default, and requires `timeout_ms` plus 5000 ms of headroom
+to fit inside every hook timeout.
+
+**Observe relaxes the verdict, not the failure.** In Observe mode a valid verdict is recorded as
+`observe` and nothing is enforced, as before. Every failure path above still denies. The developer
+image denies nothing because nothing goes wrong, and a broken sentinel is still not consulted as
+though it had said yes.
+
+**The falsifier.** `tests/Sentinel.Tests.ps1`, *THE FALSIFIER*: a policy that sleeps 30 s against a
+1000 ms `timeout_ms`. It was red at `017d476`, where the stall was allowed and stdout was `{}`, and
+it is green after that commit, denied in under 2 s with `reason=timeout` on the chain.
+
+**What is still open, stated.** The blocker is narrowed, not retired. A sentinel that cannot even
+start inside 15 s still fails open, and that covers pwsh launch and the Ledger import. The deadline
+covers the policy step. `[Environment]::Exit` ends the process on a timeout so a stalled runspace
+can't hold it past the host's clock.
+
 ## 2026-09-24 - Which merge commits have a ci run, and what the evidence is where they don't
 
 **Context.** Automerge (`.github/workflows/automerge.yml`, `scripts/Invoke-AutoMerge.ps1`) merges with the

@@ -89,7 +89,7 @@ The Ledger snake lives in `claude.build.ledger` (sibling repo). The builder must
 - Identity is operator-asserted, not signed.
 - Tail truncation is detectable at boot, not prevented.
 - No signing key.
-- 15s hook timeout fails open.
+- 15s hook timeout fails open. The sentinel denies first, at `config/sentinel.json` `timeout_ms`, so what is left open is a sentinel that cannot start inside 15s.
 - Auto-updater is disabled. Pin CLAUDE_CODE_VERSION at build.
 - PowerShell 7.4+ is law. `$ErrorActionPreference = 'Stop'`. `$PSNativeCommandUseErrorActionPreference = $true`.
 - `ConvertTo-Json` / `ConvertFrom-Json` are banned on the chain (Ledger repo). Here they're fine for plan JSON.
