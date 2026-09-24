@@ -19,6 +19,12 @@ on and what outranks what. Never transcribe repository state: run
 
 No direct push to `main`. No direct push to `develop`. One feature = one branch = one PR.
 
+**Merge commits only, and the repository enforces it.** GitHub is set to allow merge commits and
+nothing else: `mergeCommitAllowed` true, `squashMergeAllowed` false, `rebaseMergeAllowed` false.
+`tests/MergeSettings.Tests.ps1` reads those three settings live through `gh api graphql`, with the
+workflow's `GITHUB_TOKEN` in CI. No answer is a failure, not a pass. Inside the images, which carry no
+`gh`, the test skips as `SkipWhen:no-gh-cli`. Branch protection is not part of this claim.
+
 ## Plan rules
 
 - The active plan lives at `docs/plans/ACTIVE.md` — a copy of the current feature's plan file.
