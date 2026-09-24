@@ -243,6 +243,105 @@ function Get-SkipJustification {
     return $null
 }
 
+function Assert-SuiteClean {
+    <#
+    .SYNOPSIS
+        Fail on any failed test, and on any skip that does not state its reason
+        on the test object. Report the skips that do.
+
+    .DESCRIPTION
+        IT LIVES HERE SO MORE THAN ONE CALLER CAN REACH IT. It used to be a function
+        inside build/tasks/Test.build.ps1, where it called Write-Build - an Invoke-Build
+        command - so no plain pwsh script could call it. scripts/ci/Invoke-Tests.ps1, the
+        `pester` required check, therefore had no skip gate at all: it exited 1 only on a
+        failed test or an empty suite, and an unjustified skip went green in CI while the
+        same tree failed Invoke-Build Test.Unit. A required check that passes what the
+        build fails is not a floor.
+
+        Nothing in this module depends on Invoke-Build, which is the same property that
+        lets the container import it off the /work bind mount. Write-Host, not Write-Build,
+        for exactly that reason.
+
+    .PARAMETER ExcludeTag
+        The tag filter THIS RUN CARRIED, or nothing if it carried none.
+
+        Pester reports a test excluded by -ExcludeTag as NotRun, which is not a skip: it
+        was never part of the run. Passing the filter in is what lets one implementation
+        serve a run that excludes tags and a run that does not, instead of two that differ
+        by accident - which is how the host and container gates came to disagree on NotRun
+        in the first place. build/InContainer.Test.ps1 applies the same rule inline.
+
+        Test.Unit passes nothing here because it excludes nothing, so every NotRun it sees
+        really is unexplained and stays unjustified. Inconclusive gets no tag escape in
+        either case: it means an assertion gave up part-way through, which is not a
+        precondition anyone declared in advance.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]$Result,
+        [Parameter(Mandatory)][string]$Where,
+
+        [Parameter()]
+        [AllowNull()]
+        [AllowEmptyCollection()]
+        [string[]]$ExcludeTag
+    )
+
+    $excluded = @($ExcludeTag | Where-Object { $_ })
+
+    if ($Result.FailedCount -gt 0) {
+        $names = @($Result.Tests | Where-Object Result -eq 'Failed' | ForEach-Object { $_.ExpandedPath })
+        # ${Where} and not $Where: a colon straight after a variable name makes
+        # PowerShell read it as a scope qualifier, the way $script: does, and
+        # the file will not even parse.
+        throw ("${Where}: $($Result.FailedCount) test(s) failed:`n  " + ($names -join "`n  "))
+    }
+
+    # The RULE for what counts as a justification is Get-SkipJustification, above. What
+    # counts as needing one is decided here.
+    $verdicts = @(
+        $Result.Tests | ForEach-Object {
+            if ($_.Result -notin @('Skipped', 'Inconclusive', 'NotRun')) { return }
+
+            $tags = @($_.Tag)
+            $block = $_.Block
+            while ($block) { $tags += @($block.Tag); $block = $block.Parent }
+            $tags = @($tags | Where-Object { $_ })
+
+            # A test the filter excluded did not skip. It belongs in neither list.
+            if ($_.Result -eq 'NotRun' -and @($tags | Where-Object { $excluded -contains $_ }).Count -gt 0) { return }
+
+            $reason = if ($_.Result -eq 'Skipped') { Get-SkipJustification -Tag $tags } else { $null }
+
+            [pscustomobject]@{
+                Test   = $_.ExpandedPath
+                Result = [string]$_.Result
+                Reason = $reason
+            }
+        }
+    )
+
+    $unjustified = @($verdicts | Where-Object { -not $_.Reason })
+    $justified   = @($verdicts | Where-Object { $_.Reason })
+
+    # WHY, not just how many. A green log that says "skipped: 2" tells a reader
+    # nothing they can act on; grouped by reason, it tells them what precondition
+    # was unmet and therefore what would have to change for those tests to run.
+    foreach ($group in ($justified | Group-Object -Property Reason | Sort-Object -Property Name)) {
+        Write-Host ("${Where}: skipped - $($group.Name):") -ForegroundColor Yellow
+        foreach ($t in $group.Group) { Write-Host "    $($t.Test)" -ForegroundColor DarkGray }
+    }
+
+    if ($unjustified.Count -gt 0) {
+        throw ("${Where}: no justification tag (BLOCKER-n or SkipWhen:<reason>) on:`n  " +
+            (@($unjustified | ForEach-Object { "$($_.Result.ToLowerInvariant()) - $($_.Test)" }) -join "`n  "))
+    }
+
+    if ($Result.PassedCount -eq 0) {
+        throw "${Where}: no tests ran; that is a failure, not a pass"
+    }
+}
+
 Export-ModuleMember -Function 'ConvertTo-CanonicalObject', 'ConvertTo-CanonicalJson',
     'Get-StringSha256', 'Get-CanonicalJsonSha256', 'Test-AssessmentHash',
-    'Get-SkipJustification'
+    'Get-SkipJustification', 'Assert-SuiteClean'
