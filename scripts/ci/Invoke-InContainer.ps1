@@ -56,11 +56,15 @@ if (-not (Test-Path -LiteralPath $manifest)) {
     exit 1
 }
 
-$ib = $null
+# -Result takes a HASHTABLE, not a variable name. The name form sets the variable in the
+# caller's scope by name, and on the runner that failed outright - "Cannot overwrite variable
+# ib because the variable has been optimized" - after passing on the desk that wrote it.
+# InvokeBuild fills $result.Value either way; this form does not depend on scope internals.
+$result = @{}
 $failed = $null
 $clock = [System.Diagnostics.Stopwatch]::StartNew()
 try {
-    Invoke-Build Test.InContainer -File (Join-Path $RepoRoot '.build.ps1') -Result ib
+    Invoke-Build Test.InContainer -File (Join-Path $RepoRoot '.build.ps1') -Result $result
 }
 catch {
     $failed = $_
@@ -68,6 +72,7 @@ catch {
 $clock.Stop()
 
 $rows = [System.Collections.Generic.List[string]]::new()
+$ib = if ($result.ContainsKey('Value')) { $result.Value } else { $null }
 if ($ib) {
     foreach ($t in $ib.Tasks) {
         $rows.Add(('| `{0}` | {1:n1} s |' -f $t.Name, $t.Elapsed.TotalSeconds))
