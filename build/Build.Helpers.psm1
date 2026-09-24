@@ -480,22 +480,27 @@ function Invoke-ImageBuild {
         [Parameter(Mandatory)][string]$ContextRoot,
         [Parameter(Mandatory)][string]$Dockerfile,
         [Parameter(Mandatory)][string]$Tag,
-        [switch]$Quiet
+        [switch]$Quiet,
+        # Cold: never reuse the tagged image, use no layer cache, and re-pull the base.
+        [switch]$NoCache
     )
 
     $PSNativeCommandUseErrorActionPreference = $false
     $ErrorActionPreference = 'Continue'
 
     $hash = Get-ImageInputHash -ContextRoot $ContextRoot -Dockerfile $Dockerfile
-    $have = (& docker image inspect --format '{{ index .Config.Labels "org.leash.inputs" }}' $Tag 2>$null | Out-String).Trim()
-    if ($LASTEXITCODE -eq 0 -and $have -eq $hash) {
-        Write-Host "image: $Tag is current (inputs $($hash.Substring(0, 12))), not rebuilt"
-        return [pscustomobject]@{ Tag = $Tag; Hash = $hash; Reused = $true; ExitCode = 0; Output = '' }
+    if (-not $NoCache) {
+        $have = (& docker image inspect --format '{{ index .Config.Labels "org.leash.inputs" }}' $Tag 2>$null | Out-String).Trim()
+        if ($LASTEXITCODE -eq 0 -and $have -eq $hash) {
+            Write-Host "image: $Tag is current (inputs $($hash.Substring(0, 12))), not rebuilt"
+            return [pscustomobject]@{ Tag = $Tag; Hash = $hash; Reused = $true; ExitCode = 0; Output = '' }
+        }
     }
 
-    Write-Host "image: building $Tag (inputs $($hash.Substring(0, 12)))"
+    $coldArgs = if ($NoCache) { @('--no-cache', '--pull') } else { @() }
+    Write-Host "image: building $Tag (inputs $($hash.Substring(0, 12)))$(if ($NoCache) { ', cold' })"
     $lines = [System.Collections.Generic.List[string]]::new()
-    & docker build --label "org.leash.inputs=$hash" -f $Dockerfile -t $Tag $ContextRoot 2>&1 | ForEach-Object {
+    & docker build @coldArgs --label "org.leash.inputs=$hash" -f $Dockerfile -t $Tag $ContextRoot 2>&1 | ForEach-Object {
         $l = "$_"
         $lines.Add($l)
         if (-not $Quiet) { Write-Host $l }
