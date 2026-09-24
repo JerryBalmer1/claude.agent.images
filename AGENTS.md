@@ -25,7 +25,7 @@ nothing else: `mergeCommitAllowed` true, `squashMergeAllowed` false, `rebaseMerg
 workflow's `GITHUB_TOKEN` in CI. No answer is a failure, not a pass. Inside the images, which carry no
 `gh`, the test skips as `SkipWhen:no-gh-cli`. Branch protection is not part of this claim.
 
-**The commit at `main`'s tip has a completed, successful `ci` run.** Automerge merges with the
+**The commit at `main`'s tip has a completed `ci` run** (the packet's word; until seq 42 this also said *successful*, which made the check self-referential inside the ci run it measures). When the test runs inside the ci run for `main`'s tip, that run, `GITHUB_RUN_ID`, is the evidence. Automerge merges with the
 workflow's `GITHUB_TOKEN`, and a push made with that token starts no workflow. After a merge into
 `main`, `Invoke-CiDispatchOnMain` in `scripts/AutoMerge.Lib.ps1` therefore dispatches `ci.yml` on
 `main`; `workflow_dispatch` is exempt from that rule. `tests/CiOnMain.Tests.ps1` measures the claim
