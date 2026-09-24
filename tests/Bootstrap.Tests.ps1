@@ -38,6 +38,15 @@ Describe 'config/vendor.json is the submodule pin' {
         $gitlink = ((git -C $script:RepoRoot ls-tree HEAD -- $path | Out-String).Trim() -split '\s+')[2]
         $gitlink | Should -BeExactly $pin -Because 'a bump that moves the gitlink and not config/vendor.json, or the reverse, is a bootstrap that fails'
     }
+
+    It 'config/contracts.json names <path> at the same pin' -ForEach $script:Pins {
+        # The third place the pin is written. A bump that moves the gitlink and config/vendor.json
+        # but leaves the contract's evidence naming the old sha is a contract that lies (I14 PR 7).
+        $contracts = Get-Content -LiteralPath (Join-Path $script:RepoRoot 'config' 'contracts.json') -Raw
+        $named = @([regex]::Matches($contracts, [regex]::Escape($path) + ' at ([0-9a-f]{40})') | ForEach-Object { $_.Groups[1].Value })
+        $named.Count | Should -BeGreaterThan 0 -Because "config/contracts.json cites $path at a sha"
+        foreach ($sha in $named) { $sha | Should -BeExactly $pin }
+    }
 }
 
 Describe 'scripts/Bootstrap-Clean.ps1' {

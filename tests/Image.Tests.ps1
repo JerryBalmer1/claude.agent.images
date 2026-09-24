@@ -148,6 +148,15 @@ Describe 'Dockerfile pins (static)' {
         $text | Should -Match 'COPY vendor/claude\.agent\.core/modules/ledger/python/ /opt/leash/ledger/python/'
     }
 
+    It 'copies config/vendor.json into <File>, so the core pin can be read back from the image' -ForEach @(
+        @{ File = 'Dockerfile' }
+        @{ File = 'images/developer/Dockerfile' }
+    ) {
+        $instructions = (Get-Content -LiteralPath (Join-Path $script:RepoRoot $File) |
+            Where-Object { $_ -notmatch '^\s*#' }) -join "`n"
+        $instructions | Should -Match '(?m)^COPY config/vendor\.json /opt/leash/config/vendor\.json\s*$'
+    }
+
     It 'uses the PowerShell entrypoint, not the deleted shell one' -ForEach @(
         @{ File = 'Dockerfile' }
         @{ File = 'images/developer/Dockerfile' }
@@ -202,6 +211,25 @@ Describe 'Image builds and runs correctly' -Tag 'Docker' {
         $again = Invoke-ImageBuild -ContextRoot $script:RepoRoot -Dockerfile $df -Tag $Tag -Quiet
         $again.ExitCode | Should -Be 0
         $again.Reused | Should -BeTrue -Because 'nothing it reads changed since the build above'
+    }
+
+    It '<Tag> carries the core pin the tree records, and the Ledger bytes from it' -ForEach @(
+        @{ Tag = 'claude.pwsh.image.leash:run-01' }
+        @{ Tag = 'claude.pwsh.image.developer:run-01' }
+    ) {
+        # A mismatch between the pin in config and the pin in the built image is red, not a note
+        # (I14 PR 7). The image's copy of config/vendor.json is read back and held to the gitlink,
+        # and the Ledger module it ships is held to the vendored file it was copied from.
+        $gitlink = ((git -C $script:RepoRoot ls-tree HEAD -- vendor/claude.agent.core | Out-String).Trim() -split '\s+')[2]
+        $r = Invoke-Docker -Arguments @('run', '--rm', '--entrypoint', 'cat', $Tag, '/opt/leash/config/vendor.json')
+        $r.ExitCode | Should -Be 0 -Because "/opt/leash/config/vendor.json must exist in $Tag"
+        $inImage = @(($r.StdOut | ConvertFrom-Json).submodules | Where-Object path -eq 'vendor/claude.agent.core').pin
+        $inImage | Should -BeExactly $gitlink
+
+        $h = Invoke-Docker -Arguments @('run', '--rm', '--entrypoint', 'sha256sum', $Tag, '/opt/leash/ledger/ledger.psm1')
+        $h.ExitCode | Should -Be 0
+        $want = (Get-FileHash -LiteralPath (Join-Path $script:RepoRoot 'vendor' 'claude.agent.core' 'modules' 'ledger' 'ledger.psm1') -Algorithm SHA256).Hash.ToLowerInvariant()
+        ($h.StdOut.Trim() -split '\s+')[0] | Should -BeExactly $want
     }
 
     It '<Tag> runs as a non-root user' -ForEach @(
