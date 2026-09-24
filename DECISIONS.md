@@ -3,6 +3,49 @@
 Decisions that change what this repository keeps, and why. Each one points at the forensic record
 that carries its evidence. Newest first.
 
+## 2026-09-24 - Which merge commits have a ci run, and what the evidence is where they don't
+
+**Context.** Automerge (`.github/workflows/automerge.yml`, `scripts/Invoke-AutoMerge.ps1`) merges with the
+workflow's `GITHUB_TOKEN`. GitHub starts no workflow for a push made with that token, and a merge is a
+push. So an automerged merge commit gets no `ci` run of its own, on either branch. `workflow_dispatch`
+is the exception. Measured on 2026-09-24 through the Actions API, for every first-parent merge:
+
+| branch | merge commits | merged by | `ci` runs on the merge commit itself |
+|---|---|---|---|
+| `main` | `994adf8` (#7), `249752d` (#11), `6b8943a` (#15) | `github-actions` | **none** |
+| `main` | `bc7b64c` (#23) | `github-actions` | one: 35957396113, dispatched **by hand** by claude, *failure*, on the self-referential check fixed in #24 (forensic seq 42) |
+| `develop` | `b03aa76` (#1) | JerryBalmer1 | one, a `push` run: a merge made with a person's token starts workflows |
+| `develop` | every other merge, #2 to #27 | `github-actions` | none of its own |
+
+Four `develop` merge commits (`ac6f167`, `85d9066`, `74c1db2`, `28eeed2`) show one `pull_request` run each.
+Those aren't runs of `develop`. Each was the head of a promotion PR (#7, #11, #15, #23), and that is
+the promotion's own check.
+
+**Decision, main.** `6b8943a` and every automerged promotion before it have **no `ci` run on `main`**,
+and none will be manufactured. `bc7b64c` has one run, which failed, and it stays as it is. The repair
+is `Invoke-CiDispatchOnMain` (`scripts/AutoMerge.Lib.ps1`, I12 PR 3): after a merge into `main`,
+automerge dispatches `ci.yml` on `main`. Automerge's `workflow_run` runs `main`'s copy of itself, and
+the dispatch first reached `main` in `bc7b64c`. **So the I13 promotion is the first whose merge can
+dispatch, and from it forward `main`'s tip has a `ci` run.** Whether that first dispatch happened,
+and how it concluded, is measured in the I13 promotion's forensic record, not asserted here.
+`tests/CiOnMain.Tests.ps1` measures the tip live on every run. If a dispatch ever fails, that test
+goes red rather than the gap going quiet.
+
+**Decision, develop.** Automerged merges into `develop` have the same gap, and **it is not closed.**
+The dispatch is deliberately `main`-only, because a run per `develop` merge would duplicate what
+already ran. The evidence for a `develop` merge is its PR's checks. A `pull_request` run tests
+`refs/pull/<n>/merge`, the PR head merged onto `develop` as it stood when the run started. Automerge
+reads those check-runs on the head commit and merges only when every `required_checks` entry is
+`success`.
+
+**Limit of that evidence, stated.** Automerge does not check whether `develop` moved after the run
+started. If another PR lands in between, the merge commit's tree is a combination no run tested.
+Nothing in this repository requires the branch to be up to date, and branch protection is not part of
+this claim (`AGENTS.md`). In practice PRs here land one at a time, and a later promotion PR's run tests
+the combined `develop` onto `main`. That narrows the gap but doesn't close it.
+
+This entry is the written trail for readers of the public repository. It changes no code.
+
 ## 2026-09-24 - 23b1db9: a one-pair edit list unrolled into two one-character replacements
 
 **Context.** `23b1db9` (I12 PR 1) meant to change one line of `END_GOAL.md` and changed 658: every `a`
