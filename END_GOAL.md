@@ -10,6 +10,68 @@ fails the build rather than being believed.
 
 ---
 
+## 2026-09-23 67cbfd1 run-01
+
+I10 PR B, `feature/ci-incontainer`: CI runs the suite inside the image, and FINDING-M17 is
+retired with the measurement that killed it.
+
+**Changed:**
+
+- **A required `incontainer` job.** It builds both images on the runner and runs
+  `Invoke-Build Test.InContainer` through `scripts/ci/Invoke-InContainer.ps1`, uploading
+  `output/incontainer.json` as an artifact. InvokeBuild pinned at `tooling.invokebuild`
+  5.14.23. The runner measured 1m57s for the whole job, with images built cold in 67.4s -
+  under the 10-minute threshold fixed at seq 21 before measuring - so it gates pull requests
+  and is in `required_checks`. `POLICY.md` and the PR template regenerated.
+- **FINDING-M17 retired.** core is public; PR #9's `pester` job checked the submodule out
+  with no token and ran all 43 Ledger-tagged tests. The entry itself lives only in
+  `claude.pwsh.image.builder`, so it is retired on this chain at seq 21, not copied here.
+- **`scripts/ci/Invoke-Tests.ps1`: a missing Ledger now fails the check** instead of
+  excluding the tag. The exclusion existed only for the PAT nobody had; without that reason
+  it was an unguarded green.
+- **Three old END_GOAL records annotated, not rewritten** - dated notes under the sentences
+  that asserted M17's private premise, original words kept.
+- **One runner-only defect found and fixed:** `Invoke-Build -Result ib` failed on the runner
+  with "variable has been optimized" after passing locally; `-Result` now takes a hashtable.
+
+**Tested:** passed=152 failed=0 skipped=2 - in-container, `pwsh 7.6.6`, Pester 6.1.0, uid
+1001, total 175, NotRun 21 (all Docker-tagged), `unjustified_skips` empty. The same numbers
+on the runner, inside the image, in the `incontainer` job. Runner `pester`: 152 / 0 / 2,
+NotRun 21, Docker only. No test added or removed this run.
+
+**Failed:** none.
+
+**Missing:**
+
+- The Docker-tagged tests (21) still run nowhere in CI. There is no docker daemon inside the
+  image, and the runner-host `pester` job excludes them by design (M13). `docs/plans/2026-09-21-cleanup/FINDINGS.md`,
+  which M13 cites, is not in this tree.
+- `incontainer` is required from the NEXT pull request into develop: automerge reads
+  `required_checks` from the base branch.
+
+**Blockers:**
+
+- **No signing key.** Not touched. Identity is operator-asserted.
+- **Command-hook timeout fails open.** Not touched. 15s PreToolUse, Claude Code semantics.
+- The receipt-append export blocker was struck on 2026-09-23 at seq 9 and is not relisted.
+
+**Ledger head hash:** `4cd5b9348323773a72b5a949873bf3cc021f041ee46bef15ad1d563e2939e9d3`
+(receipts at `output/ledger/ledger.jsonl`. It moves on every `Test.InContainer`, so
+`Goal.Update` checks its shape, not its value.)
+
+**Assessment hash:** `798b10ee3ca2d64b28bc779611484ddc0565448c6468ae2ddaf54a53a98030a3`
+- canonical sha256 of `prompts/assessment.2026-09-21.json`, unchanged and re-verified by
+`Bootstrap`.
+
+**Forensic chain:** decision recorded BEFORE any edit at seq 21, `kind=decision`,
+`subject=ci-incontainer-m17-retired`, `prev c95ad544`, `self 6334f210`. `Goal.Update`
+appends its own `verification` record.
+
+**Falsified in the place it guards.** Scratch commit `90dfc59` put one untagged `-Skip` on a
+test inside a Ledger-tagged Describe. Run 35943528887 went red on `pester` and on
+`incontainer`, each naming exactly that test. `67cbfd1` removed it with a new commit. Before
+PR #9 the same line was excluded on the runner and would have been tolerated green.
+
 ## 2026-09-23 ffa9341 run-01
 
 I10 PR A, `feature/stale-premises`: five stale premises, one commit each, one decision
@@ -76,6 +138,7 @@ stderr, while the exit code STAYED 2 for an unrelated reason.
 **Forensic chain:** decision recorded BEFORE any edit at seq 19, `kind=decision`,
 `subject=stale-premises-five-items`, `prev 941a794b`, `self eff4c8a9`. `Goal.Update`
 appends its own `verification` record.
+
 ## 2026-09-23 0c0f714 run-01
 
 The repository is public by decision. The rule that forbade it is retired, not broken.
