@@ -10,6 +10,44 @@ f ils the build r ther th n being believed.
 
 ---
 
+## 2026-09-23 24e8812 run-01
+
+I12 PR 2, `feature/merge-settings`: the repository enforces merge commits only, and a test reads that live.
+
+**Changed:**
+
+- GitHub setting, by `gh repo edit --enable-squash-merge=false --enable-rebase-merge=false` after the
+  test was red in CI: squash `true` -> `false`, rebase `true` -> `false`, merge commit `true`. Branch
+  protection was not attempted.
+- `AGENTS.md` claim, and `tests/MergeSettings.Tests.ps1` reading the three settings through
+  `gh api graphql`. No answer is a failure. Without `gh` - inside the images - it skips as
+  `SkipWhen:no-gh-cli`. `ci.yml` gives the `pester` step `GH_TOKEN` from the workflow's `GITHUB_TOKEN`.
+- Red before the change: host, and CI run 35953595780 (`pester`: squash reported `true`).
+
+**Tested:** passed=161 failed=0 skipped=3 - in-container, `pwsh 7.6.6`, Pester 6.1.0, uid 1001,
+`unjustified_skips` empty. The third skip is `no-gh-cli`, justified on the test object.
+
+**Failed:** none.
+
+**Missing:**
+
+- The Docker-tagged tests still run nowhere in CI (I12 PR 4).
+
+**Blockers:**
+
+- **No signing key.** Not touched. Identity is operator-asserted.
+- **Command-hook timeout fails open.** Not touched. 15s PreToolUse, Claude Code semantics.
+- The receipt-append export blocker was struck on 2026-09-23 at seq 9 and is not relisted.
+
+**Ledger head hash:** `33a77e42c7a9f230735561fdbcd3abe28df294abb4d92671b0bffde536bd123a`
+(shape checked, not value.)
+
+**Assessment hash:** `798b10ee3ca2d64b28bc779611484ddc0565448c6468ae2ddaf54a53a98030a3`
+- canonical sha256 of `prompts/assessment.2026-09-21.json`, unchanged and re-verified by `Bootstrap`.
+
+**Forensic chain:** decision before the change at seq 32 (`merge-commits-only`). `Goal.Update` appends
+its own `verification` record.
+
 ## 2026-09-23 23b1db9 run-01
 
 I12 PR 1, `feature/public-hygiene`: the repository is public, so it now carries a licence and keeps
