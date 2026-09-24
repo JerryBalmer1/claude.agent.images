@@ -10,6 +10,47 @@ fails the build rather than being believed.
 
 ---
 
+## 2026-09-23 fa19d1f run-01
+
+I13 PR 1, `feature/runner-traps`: every test gate fails on a test file that fails to load, and
+`tests/run.ps1` refuses a stray positional argument.
+
+**Changed:**
+
+- `Get-SuiteLoadFailure` in `build/Build.Helpers.psm1`. `Assert-SuiteClean` (Test.Unit, CI `pester`),
+  `build/InContainer.Test.ps1` and `tests/run.ps1` all fail on a file Pester could not load, and name
+  it. Before, every one read only `FailedCount`, which a failed container leaves at 0.
+- `tests/run.ps1`: `-Evidence` is named-only, and an unbound argument is refused with exit 2 before
+  any transcript starts.
+- `tests/RunnerTraps.Tests.ps1`, 7 cases. Red at `1f0c6d2`: 1 passed, 6 failed. Green after.
+
+**Tested:** passed=195 failed=0 skipped=6 - in-container, `pwsh 7.6.6`, Pester 6.1.0, uid 1001,
+wall 40.18s, `not_loaded` empty, `unjustified_skips` empty. Host: 220 / 0 / 2 through the fixed
+runner and through Test.Unit.
+
+**Failed:** none.
+
+**Missing:**
+
+- The gate was fixed by this PR, so the PR was first measured by hand, through the fixed `run.ps1`.
+  `Invoke-Build Full` afterwards goes through the fixed gate too.
+- No test was silently not running before: 16 files load on the host, and CI run 35958785133
+  discovered 215 tests in `pester` and 215 in-container, the same as the host at `1f0c6d2`.
+
+**Blockers:**
+
+- **No signing key.** Not touched. Identity is operator-asserted.
+- **Command-hook timeout fails open.** Not touched. 15s PreToolUse, Claude Code semantics.
+- The receipt-append export blocker was struck on 2026-09-23 at seq 9 and is not relisted.
+
+**Ledger head hash:** `fdbb7f8738ad2c71e0dc978d1cc8ef5ba7b976b3099a6b750dd776ae7c120d00`
+(shape checked, not value.)
+
+**Assessment hash:** `798b10ee3ca2d64b28bc779611484ddc0565448c6468ae2ddaf54a53a98030a3`
+- canonical sha256 of `prompts/assessment.2026-09-21.json`, unchanged and re-verified by `Bootstrap`.
+
+**Forensic chain:** `Goal.Update` appends its own `verification` record.
+
 ## 2026-09-23 4290102 run-01
 
 I12, after the promotion, `feature/ci-on-main-self-run`: the ci-on-main check from PR 3 was
