@@ -37,7 +37,7 @@
     grandfathered commit. Filing it as a blocker would mean carrying it on the standing
     blocker list forever, for a state nobody plans to leave.
 
-    NOTE ON RANGES, learned the expensive way in claude.agent.substrate. These run against
+    NOTE ON RANGES, learned the expensive way in the private origin repository. These run against
     `-Base origin/develop`, never full history with -IncludeMerges. On a pull request,
     actions/checkout hands you refs/pull/N/merge - a merge commit GitHub synthesises, which
     nobody wrote and which therefore has no trailer. A full-history run with merges included
@@ -139,7 +139,7 @@ Describe 'the trailer guard over the pull-request range' {
 
     It 'rejects a Co-Authored-By trailer, which the CI port would otherwise have dropped' `
         -Tag 'SkipWhen:no-exempt-commit-in-range' -Skip:$NothingToFalsify {
-        # develop's ci.yml had a dedicated "no Co-Authored-By" step. Porting substrate's CI
+        # develop's ci.yml had a dedicated "no Co-Authored-By" step. Porting the origin's CI
         # wholesale would have lost it silently, so it is folded into the trailer guard. This
         # proves it can actually fail: an empty exemption list means the eight run-01 commits
         # that DO carry Co-Authored-By are no longer exempt, and the guard must say so by name.

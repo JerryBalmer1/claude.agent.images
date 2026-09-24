@@ -96,8 +96,8 @@ $lines.Add('')
 if (Test-Path -LiteralPath $summaryPath) {
     $s = Get-Content -LiteralPath $summaryPath -Raw -Encoding utf8 | ConvertFrom-Json
     $notRun = [int]$s.total - [int]$s.passed - [int]$s.failed - [int]$s.skipped
-    $line = 'passed={0} failed={1} skipped={2} total={3} NotRun={4} (pwsh {5}, Pester {6}, uid {7})' -f
-        $s.passed, $s.failed, $s.skipped, $s.total, $notRun, $s.ps_version, $s.pester_version, $s.uid
+    $line = 'passed={0} failed={1} skipped={2} total={3} NotRun={4} wall={8}s (pwsh {5}, Pester {6}, uid {7})' -f
+        $s.passed, $s.failed, $s.skipped, $s.total, $notRun, $s.ps_version, $s.pester_version, $s.uid, $s.duration_s
     Write-Host "incontainer: $line"
     $lines.Add("``$line``")
     $lines.Add('')

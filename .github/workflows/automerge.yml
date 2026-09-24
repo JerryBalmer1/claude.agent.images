@@ -28,7 +28,9 @@ permissions:
   pull-requests: write
   checks: read
   statuses: read
-  actions: read
+  # write, not read: after a merge into main, Invoke-CiDispatchOnMain runs gh workflow run ci.yml.
+  # A push made with GITHUB_TOKEN starts no workflow; a dispatch is the exception (I12, seq 34).
+  actions: write
 
 jobs:
   automerge:

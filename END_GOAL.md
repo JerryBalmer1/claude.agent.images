@@ -10,6 +10,255 @@ fails the build rather than being believed.
 
 ---
 
+## 2026-09-23 6ab3298 run-01
+
+I12 PR 5, `feature/ledger-receipt-caller`: `src/LedgerReceipt.ps1` is deleted. It shipped in both
+images and nothing called it.
+
+**Changed:**
+
+- `src/LedgerReceipt.ps1` and its behavioural test deleted. `AGENTS.md` and `END_GOAL.md` were checked
+  first: neither names it as a required receipt writer. The file sweep in `tests/LedgerPath.Tests.ps1`
+  stays.
+- `tests/ShippedScripts.Tests.ps1`: every script under `src/` needs a caller outside `tests/`. It was red
+  before the deletion, on this file alone.
+- Dockerfiles unchanged. No line copied this file by name; `COPY src/` stays because
+  `src/PlanValidator.ps1` ships through it. Measured after the build: `/opt/leash/src/` holds only
+  `PlanValidator.ps1` in both images.
+- `DECISIONS.md` entry.
+
+**Tested:** passed=187 failed=0 skipped=6 - in-container, `pwsh 7.6.6`, Pester 6.1.0, uid 1001,
+wall 34.01s, `unjustified_skips` empty. Both images built.
+
+**Failed:** none.
+
+**Missing:**
+
+- `tests/run.ps1` still exits 0 on a discovery failure and still binds a second positional argument to
+  `-Evidence` (recorded in the repair section below; not in I12's scope).
+
+**Blockers:**
+
+- **No signing key.** Not touched. Identity is operator-asserted.
+- **Command-hook timeout fails open.** Not touched. 15s PreToolUse, Claude Code semantics.
+- The receipt-append export blocker was struck on 2026-09-23 at seq 9 and is not relisted.
+
+**Ledger head hash:** `33a77e42c7a9f230735561fdbcd3abe28df294abb4d92671b0bffde536bd123a`
+(shape checked, not value.)
+
+**Assessment hash:** `798b10ee3ca2d64b28bc779611484ddc0565448c6468ae2ddaf54a53a98030a3`
+- canonical sha256 of `prompts/assessment.2026-09-21.json`, unchanged and re-verified by `Bootstrap`.
+
+**Forensic chain:** decision before any edit at seq 40 (`ledger-receipt-deleted`), naming the one false
+premise. `Goal.Update` appends its own `verification` record.
+
+## 2026-09-23 d4632d1 run-01
+
+I12, unplanned repair before PR 5, `feature/end-goal-repair`: this file had been corrupted by
+`23b1db9`, and it is rebuilt.
+
+**Changed:**
+
+- `END_GOAL.md` restored. `23b1db9` (I12 PR 1) rewrote 658 older lines - every `a` gone, every backtick
+  turned into `j` - where one line was meant to change. The header and every older section now come
+  from `23b1db9^`, with that one intended line re-applied. The four sections written since are kept
+  as they were.
+- `tests/EndGoalIntegrity.Tests.ps1` checks the required fields in **every** run section, not only
+  the newest, which is all `Goal.Update` reads. It was red before the repair (4 passed, 10 failed).
+
+**Tested:** passed=185 failed=0 skipped=6 - in-container, `pwsh 7.6.6`, Pester 6.1.0, uid 1001,
+wall 33.01s, `unjustified_skips` empty. (184 before this section existed: the integrity test checks each section, this one included.)
+
+**Failed:** none.
+
+**Missing:**
+
+- How `23b1db9` came to carry the damage is not established. The file had changed on disk between the
+  scripted email edit and the next edit. This record says that much and no more.
+- `tests/run.ps1` exits 0 when a test file fails discovery, and a second positional argument binds
+  to `-Evidence`, which force-overwrites that path with a transcript. Both were met during this repair.
+  Both are recorded and not fixed here.
+
+**Blockers:**
+
+- **No signing key.** Not touched. Identity is operator-asserted.
+- **Command-hook timeout fails open.** Not touched. 15s PreToolUse, Claude Code semantics.
+- The receipt-append export blocker was struck on 2026-09-23 at seq 9 and is not relisted.
+
+**Ledger head hash:** `33a77e42c7a9f230735561fdbcd3abe28df294abb4d92671b0bffde536bd123a`
+(shape checked, not value.)
+
+**Assessment hash:** `798b10ee3ca2d64b28bc779611484ddc0565448c6468ae2ddaf54a53a98030a3`
+- canonical sha256 of `prompts/assessment.2026-09-21.json`, unchanged and re-verified by `Bootstrap`.
+
+**Forensic chain:** confession at seq 38 (`end-goal-corrupted-by-23b1db9`). `Goal.Update` appends its
+own `verification` record.
+
+## 2026-09-23 c7b2dee run-01
+
+I12 PR 4, `feature/docker-tests-in-ci`: the 21 Docker-tagged tests run in CI, and the in-container
+suite's wall time is shown.
+
+**Changed:**
+
+- `scripts/ci/Invoke-Tests.ps1` excludes no tag. The `pester` required check on the ubuntu runner
+  builds both images and runs the Docker-tagged tests. A hard gate fails the check on any NotRun.
+- `Test.InContainer` and the `incontainer` job print `wall=<s>s`, from the `duration_s` the in-container
+  run already wrote.
+- `tests/CiCoverage.Tests.ps1`: red before the fix (0 passed, 4 failed), green after.
+
+**Tested:** passed=169 failed=0 skipped=6 - in-container, `pwsh 7.6.6`, Pester 6.1.0, uid 1001,
+`unjustified_skips` empty. **In-container suite wall time: 33.5s** (`Test.InContainer` at `c7b2dee`;
+the task took 39.3s with container start). `scripts/ci/Invoke-Tests.ps1` locally, as CI runs it:
+total=196 passed=193 failed=0 skipped=3 **notrun=0**, 90s. The Docker-tagged tests needed no new skip.
+
+**Failed:** none.
+
+**Missing:**
+
+- The Docker-tagged tests still cannot run inside the image: there is no docker daemon there. They run
+  in the `pester` check instead, which is where the packet asked for them.
+- `src/LedgerReceipt.ps1` still ships with no caller (I12 PR 5).
+
+**Blockers:**
+
+- **No signing key.** Not touched. Identity is operator-asserted.
+- **Command-hook timeout fails open.** Not touched. 15s PreToolUse, Claude Code semantics.
+- The receipt-append export blocker was struck on 2026-09-23 at seq 9 and is not relisted.
+
+**Ledger head hash:** `33a77e42c7a9f230735561fdbcd3abe28df294abb4d92671b0bffde536bd123a`
+(shape checked, not value.)
+
+**Assessment hash:** `798b10ee3ca2d64b28bc779611484ddc0565448c6468ae2ddaf54a53a98030a3`
+- canonical sha256 of `prompts/assessment.2026-09-21.json`, unchanged and re-verified by `Bootstrap`.
+
+**Forensic chain:** decision before any edit at seq 36 (`docker-tests-in-ci`). `Goal.Update` appends its
+own `verification` record.
+
+## 2026-09-23 f470895 run-01
+
+I12 PR 3, `feature/ci-on-main`: after a merge into main, automerge dispatches `ci.yml` on main.
+
+**Changed:**
+
+- `Invoke-CiDispatchOnMain` in `scripts/AutoMerge.Lib.ps1`, called by `Invoke-AutoMerge.ps1` after the
+  merge. `automerge.yml` gets `actions: write`. `ci.yml` gets `workflow_dispatch` and `actions: read`.
+- `AGENTS.md` claim: the commit at main's tip has a completed, successful ci run.
+- `tests/CiOnMain.Tests.ps1`: the dispatch decision with `gh` shadowed, the checker on fixed commits
+  (`6b8943a` has 0 ci runs, measured, kept as the red case; `74c1db2` has one), and the live claim.
+  Red before the fix: 4 failed.
+
+**Tested:** passed=165 failed=0 skipped=6 - in-container, `pwsh 7.6.6`, Pester 6.1.0, uid 1001,
+`unjustified_skips` empty. The three new skips are `no-gh-cli`.
+
+**Failed:** none.
+
+**Missing:**
+
+- **The live claim cannot run yet.** Automerge's `workflow_run` runs `main`'s copy of itself, so the
+  promotion that brings the dispatch to `main` is merged by the pre-dispatch copy. The packet's
+  "confirm PR 3's dispatch produced a ci run on the new main tip" rests on a false premise for that
+  promotion. The first automerge dispatch comes one promotion later.
+- Automerged merges into `develop` get no push CI either. Their trees are the checked pull request
+  heads. This is recorded at seq 34 and not changed.
+- The Docker-tagged tests still run nowhere in CI (I12 PR 4).
+
+**Blockers:**
+
+- **No signing key.** Not touched. Identity is operator-asserted.
+- **Command-hook timeout fails open.** Not touched. 15s PreToolUse, Claude Code semantics.
+- The receipt-append export blocker was struck on 2026-09-23 at seq 9 and is not relisted.
+
+**Ledger head hash:** `33a77e42c7a9f230735561fdbcd3abe28df294abb4d92671b0bffde536bd123a`
+(shape checked, not value.)
+
+**Assessment hash:** `798b10ee3ca2d64b28bc779611484ddc0565448c6468ae2ddaf54a53a98030a3`
+- canonical sha256 of `prompts/assessment.2026-09-21.json`, unchanged and re-verified by `Bootstrap`.
+
+**Forensic chain:** decision before any edit at seq 34 (`ci-on-main`), naming the false premise.
+`Goal.Update` appends its own `verification` record.
+
+## 2026-09-23 24e8812 run-01
+
+I12 PR 2, `feature/merge-settings`: the repository enforces merge commits only, and a test reads that live.
+
+**Changed:**
+
+- GitHub setting, by `gh repo edit --enable-squash-merge=false --enable-rebase-merge=false` after the
+  test was red in CI: squash `true` -> `false`, rebase `true` -> `false`, merge commit `true`. Branch
+  protection was not attempted.
+- `AGENTS.md` claim, and `tests/MergeSettings.Tests.ps1` reading the three settings through
+  `gh api graphql`. No answer is a failure. Without `gh` - inside the images - it skips as
+  `SkipWhen:no-gh-cli`. `ci.yml` gives the `pester` step `GH_TOKEN` from the workflow's `GITHUB_TOKEN`.
+- Red before the change: host, and CI run 35953595780 (`pester`: squash reported `true`).
+
+**Tested:** passed=161 failed=0 skipped=3 - in-container, `pwsh 7.6.6`, Pester 6.1.0, uid 1001,
+`unjustified_skips` empty. The third skip is `no-gh-cli`, justified on the test object.
+
+**Failed:** none.
+
+**Missing:**
+
+- The Docker-tagged tests still run nowhere in CI (I12 PR 4).
+
+**Blockers:**
+
+- **No signing key.** Not touched. Identity is operator-asserted.
+- **Command-hook timeout fails open.** Not touched. 15s PreToolUse, Claude Code semantics.
+- The receipt-append export blocker was struck on 2026-09-23 at seq 9 and is not relisted.
+
+**Ledger head hash:** `33a77e42c7a9f230735561fdbcd3abe28df294abb4d92671b0bffde536bd123a`
+(shape checked, not value.)
+
+**Assessment hash:** `798b10ee3ca2d64b28bc779611484ddc0565448c6468ae2ddaf54a53a98030a3`
+- canonical sha256 of `prompts/assessment.2026-09-21.json`, unchanged and re-verified by `Bootstrap`.
+
+**Forensic chain:** decision before the change at seq 32 (`merge-commits-only`). `Goal.Update` appends
+its own `verification` record.
+
+## 2026-09-23 23b1db9 run-01
+
+I12 PR 1, `feature/public-hygiene`: the repository is public, so it now carries a licence and keeps
+private names and addresses out of tracked files.
+
+**Changed:**
+
+- `LICENSE`, MIT, JerryBalmer1, 2026, stated in one line of `README.md`.
+- Scan of every tracked file at `e195e49`: 0 local user paths, 0 tokens or keys, 1 email address
+  (the line below at `:291` in the 2026-09-23 0c0f714 section), and 45 occurrences of the private
+  origin repository's name, 35 of them in live files. All live hits are edited.
+- `tests/PublicHygiene.Tests.ps1` fails on any of the four in a tracked file outside `.continuity/`.
+  Red at `e195e49`: host, and CI run 35952853389 (`pester` 2 failed, on email and name).
+- `DECISIONS.md` created. It lists the forensic records that carry a hit and are not edited.
+
+**Tested:** passed=161 failed=0 skipped=2 - in-container, `pwsh 7.6.6`, Pester 6.1.0, uid 1001,
+`unjustified_skips` empty. Five tests added.
+
+**Failed:** none.
+
+**Missing:**
+
+- Personal author addresses in git commit metadata and in older blobs of this file. They can only be
+  cleared by a history rewrite, which is not done here and never is. See `DECISIONS.md`.
+- The Docker-tagged tests still run nowhere in CI (I12 PR 4).
+
+**Blockers:**
+
+- **No signing key.** Not touched. Identity is operator-asserted.
+- **Command-hook timeout fails open.** Not touched. 15s PreToolUse, Claude Code semantics.
+- The receipt-append export blocker was struck on 2026-09-23 at seq 9 and is not relisted.
+
+**Ledger head hash:** `33a77e42c7a9f230735561fdbcd3abe28df294abb4d92671b0bffde536bd123a`
+(receipts at `output/ledger/ledger.jsonl`; `Goal.Update` checks its shape, not its value.)
+
+**Assessment hash:** `798b10ee3ca2d64b28bc779611484ddc0565448c6468ae2ddaf54a53a98030a3`
+- canonical sha256 of `prompts/assessment.2026-09-21.json`, unchanged and re-verified by
+`Bootstrap`.
+
+**Forensic chain:** decision before any edit at seq 29 (`public-hygiene`), the finding for
+records left unedited at seq 30 (`public-hygiene-records-not-edited`). `Goal.Update` appends its
+own `verification` record.
+
 ## 2026-09-23 439e2c4 run-01
 
 I11 PR B, `feature/drop-directory-guard`: `tests/run.ps1` no longer refuses on its folder name. The
@@ -288,7 +537,7 @@ tracked.
   five payloads, five correct verdicts - so this is a timing property, not a broken
   shape. Open `/hooks` once, or start a new session.
 - **Commit metadata carries a personal email and cannot be fixed.** `git log --all` shows
-  `jerry.infra@gmail.com` as the author of every human commit and the committer of every
+  a personal gmail address (removed from this line 2026-09-24, I12 PR 1; it remains in git history) as the author of every human commit and the committer of every
   commit in the repository, and it is now world-readable. No history rewrite - not now,
   not ever. `git config user.email` in this clone is still that address, so every future
   commit adds it again; stopping the forward leak is a one-line identity change plus

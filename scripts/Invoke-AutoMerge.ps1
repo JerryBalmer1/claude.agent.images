@@ -1,13 +1,14 @@
 #Requires -Version 7.4
 #
 # COPIED, NOT VENDORED.
-#   origin repo   : claude.agent.substrate
+#   origin repo   : a private sibling repository (not public)
 #   origin file   : scripts/Invoke-AutoMerge.ps1
 #   origin commit : 912c1c9eb48ab0b639d257bc7b10661d7212f985
 #   origin sha256 : b3c9716326dd26d433f56e7c09d26a3b4afdd4ae4a5b2fbecf81165dd054beb8
-#   adapted here  : no - byte-identical at copy time
+#   adapted here  : YES - 2026-09-24 (I12): dispatches ci on main after a merge; earlier, the origin's name was
+#                   removed from these comments on 2026-09-24 (public hygiene, I12)
 #
-# There is no submodule here and substrate does not follow this copy. If substrate's
+# There is no submodule here and the origin does not follow this copy. If the origin's
 # version moves, this one does not move with it. Diff the two against the origin commit
 # above before assuming they still agree.
 #
@@ -59,7 +60,7 @@
     Get-ReviewConfigRef to the head turns it red without a pull request being opened.
 
 .EXAMPLE
-    ./scripts/Invoke-AutoMerge.ps1 -Repo JerryBalmer1/claude.agent.substrate -PullRequest 1
+    ./scripts/Invoke-AutoMerge.ps1 -Repo JerryBalmer1/claude.agent.images -PullRequest 1
 #>
 [CmdletBinding()]
 param(
@@ -193,4 +194,10 @@ if ($deleteBranch) { $mergeArgs += '--delete-branch' }
 & gh @mergeArgs
 
 Write-Step "merged #$($pr.number)"
+
+# A push made with GITHUB_TOKEN starts no workflow, so without this the merge commit on main has
+# no ci run. workflow_dispatch is exempt. See Invoke-CiDispatchOnMain in AutoMerge.Lib.ps1.
+$dispatch = Invoke-CiDispatchOnMain -Repo $Repo -BaseRef $pr.baseRefName -Config $config
+if ($dispatch.Dispatched) { Write-Step "dispatched ci.yml on $($dispatch.Ref)" }
+else { Write-Step "no ci dispatch: base '$($pr.baseRefName)' is not main" }
 exit 0

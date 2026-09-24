@@ -1,13 +1,13 @@
 #Requires -Version 7.4
 #
 # COPIED, NOT VENDORED.
-#   origin repo   : claude.agent.substrate
+#   origin repo   : a private sibling repository (not public)
 #   origin file   : scripts/Generate-Policy.ps1
 #   origin commit : 912c1c9eb48ab0b639d257bc7b10661d7212f985
 #   origin sha256 : eb01af43eaae005b7c554d06a3b79a15aa8718cd0e33b6b5f928193a22239560
 #   adapted here  : YES - adapted for this repo, diff before assuming they agree
 #
-# There is no submodule here and substrate does not follow this copy. If substrate's
+# There is no submodule here and the origin does not follow this copy. If the origin's
 # version moves, this one does not move with it. Diff the two against the origin commit
 # above before assuming they still agree.
 #
@@ -236,8 +236,8 @@ function New-PullRequestTemplate {
     & $add ''
     & $add '## Wall'
     & $add ''
-    # The wall is this repository's, not the one this generator was copied from. substrate's
-    # version said "substrate is never a container", which is the exact opposite of true here.
+    # The wall is this repository's, not the one this generator was copied from. The origin's
+    # version said the origin "is never a container", which is the exact opposite of true here.
     & $add '- [ ] Nothing under `vendor/` was edited, and the submodule pin is unchanged'
     & $add '- [ ] No sibling repository was touched'
     & $add '- [ ] `Invoke-Build` is still the only entry point - no direct docker, Pester or ScriptAnalyzer call'

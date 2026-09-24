@@ -19,6 +19,22 @@ on and what outranks what. Never transcribe repository state: run
 
 No direct push to `main`. No direct push to `develop`. One feature = one branch = one PR.
 
+**Merge commits only, and the repository enforces it.** GitHub is set to allow merge commits and
+nothing else: `mergeCommitAllowed` true, `squashMergeAllowed` false, `rebaseMergeAllowed` false.
+`tests/MergeSettings.Tests.ps1` reads those three settings live through `gh api graphql`, with the
+workflow's `GITHUB_TOKEN` in CI. No answer is a failure, not a pass. Inside the images, which carry no
+`gh`, the test skips as `SkipWhen:no-gh-cli`. Branch protection is not part of this claim.
+
+**The commit at `main`'s tip has a completed, successful `ci` run.** Automerge merges with the
+workflow's `GITHUB_TOKEN`, and a push made with that token starts no workflow. After a merge into
+`main`, `Invoke-CiDispatchOnMain` in `scripts/AutoMerge.Lib.ps1` therefore dispatches `ci.yml` on
+`main`; `workflow_dispatch` is exempt from that rule. `tests/CiOnMain.Tests.ps1` measures the claim
+live. **Measured limit:** the claim is about the tip. `6b8943a` and every earlier automerged
+promotion have no `ci` run, and the test keeps `6b8943a` as its red case. Automerge's `workflow_run`
+runs `main`'s copy of itself, so the promotion that first brings the dispatch to `main` is merged
+without it. Until `main` carries the dispatch, the live test skips as
+`SkipWhen:main-predates-ci-dispatch`.
+
 ## Plan rules
 
 - The active plan lives at `docs/plans/ACTIVE.md` — a copy of the current feature's plan file.
