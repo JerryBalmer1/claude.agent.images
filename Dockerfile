@@ -28,16 +28,31 @@ ENV DEBIAN_FRONTEND=noninteractive
 # libicu74 and libssl3 are pwsh's runtime dependencies on 24.04. Without them
 # the binary extracts cleanly and then refuses to start, which is a confusing
 # failure to debug three layers later.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        ca-certificates \
-        curl \
-        git \
-        less \
-        libicu74 \
-        libssl3 \
-        locales \
-        sudo \
-    && rm -rf /var/lib/apt/lists/*
+#
+# apt retries with a bounded backoff: five attempts, sleeping 2, 8, 18 and 32 seconds between
+# them, then the build fails. `--error-on=any`, because a plain `apt-get update` exits 0 when it
+# cannot resolve the mirror and the failure then surfaces at install as a missing package. One
+# CI run failed on DNS for archive.ubuntu.com (I12). Measured in this base with --network none:
+# five attempts, 96s, exit 1. The layer is the same in both Dockerfiles but for the package list.
+RUN set -eu; \
+    for attempt in 1 2 3 4 5; do \
+        if apt-get -o Acquire::Retries=3 update --error-on=any \
+            && apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
+                ca-certificates \
+                curl \
+                git \
+                less \
+                libicu74 \
+                libssl3 \
+                locales \
+                sudo; then \
+            break; \
+        fi; \
+        if [ "$attempt" -eq 5 ]; then echo "apt: gave up after $attempt attempts" >&2; exit 1; fi; \
+        echo "apt: attempt $attempt failed, retrying in $((attempt * attempt * 2))s" >&2; \
+        sleep $((attempt * attempt * 2)); \
+    done; \
+    rm -rf /var/lib/apt/lists/*
 
 # PowerShell 7.6.x from the pinned tarball. Verify, then extract. Never the
 # other way round.

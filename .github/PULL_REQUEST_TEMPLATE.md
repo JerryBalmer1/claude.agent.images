@@ -30,6 +30,7 @@ Tick exactly one. Any other pair fails the `branch-flow` check.
 - [ ] `trailer-guard`
 - [ ] `branch-flow`
 - [ ] `generated-match-config`
+- [ ] `images`
 - [ ] `pester`
 - [ ] `incontainer`
 - [ ] `forensic-verify`

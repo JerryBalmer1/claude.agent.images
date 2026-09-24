@@ -48,6 +48,7 @@ waited for. Flipping the mode to `human` and regenerating stops that on the next
 - `trailer-guard`
 - `branch-flow`
 - `generated-match-config`
+- `images`
 - `pester`
 - `incontainer`
 - `forensic-verify`
