@@ -79,6 +79,30 @@ jobs:
       - shell: pwsh
         run: ./scripts/ci/Invoke-Tests.ps1
 
+  incontainer:
+    runs-on: ubuntu-latest
+    steps:
+      # The suite where the artefact is: both images built on the runner, then Invoke-Build
+      # Test.InContainer - the task a promotion measures as clause (b) - runs it inside the leash
+      # image as the non-root user. The script reports per-task elapsed time in the job summary,
+      # because whether this job may gate pull requests was decided on that number (forensic
+      # chain seq 21) and it should stay visible on every run.
+      #
+      # fetch-depth: 0 for the same reason as pester: the repository is bind-mounted at /work
+      # and the trailer tests walk its history from inside the container.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - shell: pwsh
+        run: ./scripts/ci/Invoke-InContainer.ps1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: incontainer
+          path: output/incontainer.json
+          if-no-files-found: error
+
   forensic-verify:
     runs-on: ubuntu-latest
     steps:

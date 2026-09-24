@@ -68,34 +68,29 @@ Write-Host "pester: imported $((Get-Module Pester).Version)"
 # Dockerfile goes green here. See docs/plans/2026-09-21-cleanup/FINDINGS.md FINDING-M13.
 $excludeTag = @('Docker')
 
-# The vendored Ledger is a PRIVATE submodule, and actions/checkout's GITHUB_TOKEN is scoped to
-# this repository only - so on a runner, vendor/ is empty and every test that loads the module
-# fails in a way that reads like a product defect rather than a missing checkout. Measured: the
-# sentinel returning exit 2 where 0 was expected, the entrypoint calling the chain broken,
-# "ledger.psd1 did not exist".
+# The vendored Ledger MUST be present. Without it every Ledger-tagged test fails in a way that
+# reads like a product defect rather than a missing checkout - measured: the sentinel returning
+# exit 2 where 0 was expected, the entrypoint calling the chain broken, "ledger.psd1 did not
+# exist" - so its absence is named here and fails the check before any test runs.
 #
-# Rather than pretend, this DETECTS the absence and says so. Locally and in the container the
-# submodule is present and nothing is excluded; on CI the run prints exactly which tests it did
-# not perform and why. Degrading visibly beats either a red build nobody can fix without a
-# credential, or a green one that quietly proved less than it claims.
-#
-# The real fix is a PAT with read access to claude.agent.core, stored as a repository secret
-# and passed to actions/checkout as `token:`. That is Jerry's to create. FINDING-M17.
+# Until 2026-09-23 absence EXCLUDED the Ledger tag instead, with a warning, because the
+# submodule was believed private and fetching it needed a PAT nobody had created (FINDING-M17,
+# recorded in the sibling this repository was born from, not in this tree). core is public:
+# ci.yml checks it out with `submodules: recursive` and no token, and PR #9's pester job ran all
+# 43 Ledger-tagged tests that way. With the credential reason gone, the exclusion had become an
+# unguarded green - drop the checkout line and 43 tests go quietly NotRun while this passes.
+# M17 is retired on the forensic chain at seq 21.
 $ledgerManifest = Join-Path $RepoRoot 'vendor/claude.agent.core/modules/ledger/ledger.psd1'
 if (-not (Test-Path -LiteralPath $ledgerManifest)) {
-    $excludeTag += 'Ledger'
     Write-Host ''
-    Write-Host 'pester: WARNING -- the vendored Ledger module is NOT present.'
+    Write-Host 'pester: FAIL -- the vendored Ledger module is NOT present.'
     Write-Host "pester:   expected  $ledgerManifest"
-    Write-Host 'pester:   cause     vendor/claude.agent.core is a private submodule and the'
-    Write-Host 'pester:             workflow GITHUB_TOKEN cannot clone another repository.'
-    Write-Host 'pester:   effect    every Ledger-tagged test is EXCLUDED from this run.'
-    Write-Host 'pester:   fix       a PAT with read access, as a repo secret, passed to'
-    Write-Host 'pester:             actions/checkout as token:. See FINDING-M17.'
-    Write-Host ''
+    Write-Host 'pester:   fix       the actions/checkout step needs submodules: recursive.'
+    Write-Host 'pester:             core is public; no token is required.'
+    exit 1
 }
 
-Write-Host "pester: excluding tag(s) [$($excludeTag -join ', ')] -- see FINDING-M13, FINDING-M17"
+Write-Host "pester: excluding tag(s) [$($excludeTag -join ', ')] -- see FINDING-M13"
 
 $pc = New-PesterConfiguration
 $pc.Run.Path           = $testPath
@@ -124,8 +119,7 @@ if ($result.TotalCount -eq 0) {
 #
 # Assert-SuiteClean is the SAME function Test.Unit calls, from build/Build.Helpers.psm1 -
 # not a port of it. The excluded tags are passed in because Pester reports a tag-excluded
-# test as NotRun, and on a runner that is most of the suite: the Ledger-tagged tests are
-# excluded above for want of a PAT (FINDING-M17) and the Docker-tagged ones by design. A
+# test as NotRun: on a runner that is the 21 Docker-tagged tests, excluded above by design. A
 # NotRun the filter explains is tolerated; a skip with no reason on the test object is not.
 $helpers = Join-Path $RepoRoot 'build/Build.Helpers.psm1'
 Import-Module $helpers -Force -ErrorAction Stop
