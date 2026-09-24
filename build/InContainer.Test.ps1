@@ -219,10 +219,15 @@ if (Test-Path -LiteralPath $LedgerDir -PathType Container) {
     }
 }
 
+# A test file that failed to load is in none of the counts below. Asked of the shared helper so
+# this gate and the host's cannot disagree about it.
+$notLoaded = @(Get-SuiteLoadFailure -Result $result)
+
 $summary = [ordered]@{
     ledger_head        = $ledgerHead
     passed             = $result.PassedCount
     failed             = $result.FailedCount
+    not_loaded         = @($notLoaded | ForEach-Object { [ordered]@{ file = $_.File; error = $_.Error } })
     skipped            = $result.SkippedCount
     total              = $result.TotalCount
     duration_s         = [math]::Round($result.Duration.TotalSeconds, 2)
@@ -241,6 +246,11 @@ $summary | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath "$ResultPath.json"
 
 Write-Output ("[in-container] passed={0} failed={1} skipped={2}" -f
     $result.PassedCount, $result.FailedCount, $result.SkippedCount)
+
+if ($notLoaded.Count -gt 0) {
+    foreach ($n in $notLoaded) { Write-Error "[in-container] not loaded, its tests did not run: $($n.File): $($n.Error)" }
+    exit 1
+}
 
 if ($result.FailedCount -gt 0) {
     Write-Error "[in-container] $($result.FailedCount) test(s) failed"

@@ -289,6 +289,14 @@ function Assert-SuiteClean {
 
     $excluded = @($ExcludeTag | Where-Object { $_ })
 
+    # First, because a file that did not load has no tests in any count below: FailedCount,
+    # the skip verdicts and PassedCount all read as if the file did not exist.
+    $notLoaded = @(Get-SuiteLoadFailure -Result $Result)
+    if ($notLoaded.Count -gt 0) {
+        throw ("${Where}: $($notLoaded.Count) test file(s) failed to load; their tests did not run:`n  " +
+            (@($notLoaded | ForEach-Object { "$($_.File)`n    $($_.Error)" }) -join "`n  "))
+    }
+
     if ($Result.FailedCount -gt 0) {
         $names = @($Result.Tests | Where-Object Result -eq 'Failed' | ForEach-Object { $_.ExpandedPath })
         # ${Where} and not $Where: a colon straight after a variable name makes
@@ -342,6 +350,36 @@ function Assert-SuiteClean {
     }
 }
 
+function Get-SuiteLoadFailure {
+    <#
+    .SYNOPSIS
+        One object per test file that failed to load, with the file and the error.
+
+    .DESCRIPTION
+        A file that fails to parse, or throws while Pester discovers it, is a FAILED CONTAINER.
+        Pester counts it in FailedContainersCount and leaves FailedCount at 0, and its tests
+        appear in no count at all. Until 2026-09-24 every gate in this repository read only
+        FailedCount - tests/run.ps1, Assert-SuiteClean, build/InContainer.Test.ps1 - so such a
+        file was green by omission. Measured at 1f0c6d2: a file with a syntax error, runner
+        exit 0. tests/RunnerTraps.Tests.ps1 holds each gate to this.
+
+        Every caller asks this one function, so the gates cannot disagree about what "did not
+        load" means.
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)]$Result)
+
+    if (-not ($Result.PSObject.Properties.Name -contains 'FailedContainersCount')) { return }
+    if ($Result.FailedContainersCount -le 0) { return }
+
+    foreach ($c in @($Result.FailedContainers)) {
+        [pscustomobject]@{
+            File  = [string]$c.Item
+            Error = (@($c.ErrorRecord | ForEach-Object { $_.Exception.Message }) -join ' | ')
+        }
+    }
+}
+
 Export-ModuleMember -Function 'ConvertTo-CanonicalObject', 'ConvertTo-CanonicalJson',
     'Get-StringSha256', 'Get-CanonicalJsonSha256', 'Test-AssessmentHash',
-    'Get-SkipJustification', 'Assert-SuiteClean'
+    'Get-SkipJustification', 'Assert-SuiteClean', 'Get-SuiteLoadFailure'
