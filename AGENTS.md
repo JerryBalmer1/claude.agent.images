@@ -53,7 +53,11 @@ outcome: <one line>
 - No vendoring Ledger / Inspector / Policy into `src/` in a process-only plan.
 - No `Co-Authored-By` trailers.
 - No force-push.
-- Never make this repo public.
+- **This repository is PUBLIC** as of 2026-09-23, by Jerry's decision, and is visible as work
+  in progress. The prohibition that stood on this line until then is retired, and the
+  disagreement table below records it. What replaces it is not a weaker rule: nothing goes into
+  this tree that should not be read by a stranger, and core's
+  `docs/plans/2026-09-22-public-release/` governs what stays out of a public tree.
 
 ## The human gate
 
@@ -195,3 +199,4 @@ number is given where one exists.
 | 5 | `No Co-Authored-By trailers` appears only on the develop side. | **It governs**, on both. The stricter rule wins, and it is the one this repo's CI can actually check. Every commit carries `who: <actor>` as its last line instead. |
 | 6 | Branch rules mandate `release/*` and `hotfix/*`. Neither exists; work goes `feature/* -> develop -> main`. | **Both true.** The extra branch classes are unused, not forbidden. Nothing is dropped. |
 | 7 | Both sides say "PowerShell 7.4+ is law", while the in-container runtime floor is 7.6. (BLOCKER-6) | **No contradiction between these two files.** 7.4 is the *script* contract, 7.6 is the *runtime* floor. They are different things that happen to look alike, which is exactly why BLOCKER-6 asks for one authoritative location. |
+| 8 | `## Do not` carried **"Never make this repo public"** from birth. Measured 2026-09-23, the first day `scripts/state.ps1` was able to run here at all: the GitHub API reports `private: False`. When the repository became public is recorded nowhere in this tree. | **RETIRED 2026-09-23, superseded by a decision rather than by drift.** Jerry decided the repository stays public, and a decision outranks a rule the way row 2's reading outranks the prose around it. The rule held until 2026-09-23 and not one day after. It is listed rather than deleted because the SEQUENCE is the finding: the rule was being broken while `state.ps1` sat refusing to run and therefore unable to say so, it became sayable the moment that guard was fixed (seq 12, item 5), and it was retired one packet later once someone decided - not quietly dropped. From here core's `docs/plans/2026-09-22-public-release/` governs what stays out of a public tree; this repository does not vendor that plan, so the authority is named and not copied. `state.ps1` still prints `private:` as a measurement and no longer calls it a violation. **Zero tests asserted the old rule** - measured, not assumed - so nothing had to be removed to retire it. Forensic chain seq 16, `repo-public-by-decision`. |
