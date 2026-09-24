@@ -16,6 +16,9 @@ one points at its forensic record and, where one exists, the decision in `DECISI
   gives `Object[]` of 2 and the same exception.
 - **Not fixed in I13.** It's outside the packet's list, and a fix reaches `main` only with the next promotion. The fix: `$null =`
   on the `gh` call, plus a test whose stub prints a line.
+- **Caught now by.** `tests/CiOnMain.Tests.ps1`, *returns one clean object when gh workflow run prints a line*: red at
+  `25113c6` with *Expected 1, but got 2*, green once `$null =` landed in the commit after it. The fix reaches the dispatching
+  automerge only when `main` carries it, since automerge's `workflow_run` runs `main`'s copy.
 - **Records.** Forensic chain seq 50, finding, `automerge-dispatch-output-leak`. The promotion is at seq 49.
 
 ## I13-F1 - 23b1db9 rewrote 658 lines of END_GOAL.md where one was meant
