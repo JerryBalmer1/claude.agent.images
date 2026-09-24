@@ -3,6 +3,32 @@
 Defects found in this repository: what they did, what caused them, and what catches them now. Each
 one points at its forensic record and, where one exists, the decision in `DECISIONS.md`. Newest first.
 
+## F97 - one commit, one machine, two input hashes: the key reads untracked files in the vendored Ledger
+
+Numbered after core's F96, as Jerry directed. It isn't in the `I14-Fn` series.
+
+- **What it did.** The two clones were both on this Windows machine, both had `core.autocrlf=true`, and both were at
+  `8e309d7`. They gave different image input hashes. The long-lived working clone gave leash `44976343b9c1` and developer
+  `7abc1bec4495`. A fresh clone made by `scripts/Bootstrap-Clean.ps1 -NoCache` under the system temp folder gave leash
+  `656fc382a2ba` and developer `036f96fe6ebf`. The full hashes are in forensic seq 52. The content is the same, because
+  both checkouts are the same commit with the same submodule gitlink, `db12239`.
+- **Measured cause.** The entry list `Get-ImageInputHash` hashes (`build/Build.Helpers.psm1`) was printed from both
+  clones and compared. Every line matches except the directory entry for
+  `vendor/claude.agent.core/modules/ledger/python/`. That entry has 7 files in the working clone and 5 in the fresh one.
+  The two extra files are `__pycache__/snake.cpython-310.pyc` and `__pycache__/validators.cpython-310.pyc`. They are
+  untracked and ignored by core's `.gitignore:13`. A host CPython 3.10 wrote them at 2026-09-24T02:08:41Z, and nothing
+  records which run did it.
+  `Get-ChildItem -Recurse -File -Force` reads them, and nothing in `.dockerignore` excludes `__pycache__`.
+- **Suspected causes ruled out by that measurement.** Line endings don't explain it: both clones are `autocrlf=true`,
+  and every per-file hash that exists in both matches. Path components in the key don't explain it either: entries
+  are context-relative, and the paths match line for line. File ordering doesn't: the shared entries appear in the
+  same order. I14-F2's line-ending mechanism is real, but it isn't what separates these two.
+- **Consequence.** The key is meant to identify what `COPY` sends, and here it did. That makes it likely, though
+  unmeasured, that the working clone's images also shipped the two `.pyc` files under `/opt/leash/ledger/python/`.
+  If so, a local image can carry bytes that no commit names.
+- **Not fixed.** Jerry's direction for I14 is to record it. The candidate fixes are to exclude `__pycache__/` in
+  `.dockerignore` and in the key, or to build from the index (as in I14-F2).
+
 ## I14-F2 - the image input hash reads working-tree bytes, so line endings change it
 
 - **What it did.** In I14 PR 4 the same commit, `ac72829`, gave two input hashes for the leash image: `9707b49add1d`,
