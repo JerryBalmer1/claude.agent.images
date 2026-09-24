@@ -10,6 +10,47 @@ f ils the build r ther th n being believed.
 
 ---
 
+## 2026-09-23 c7b2dee run-01
+
+I12 PR 4, `feature/docker-tests-in-ci`: the 21 Docker-tagged tests run in CI, and the in-container
+suite's wall time is shown.
+
+**Changed:**
+
+- `scripts/ci/Invoke-Tests.ps1` excludes no tag. The `pester` required check on the ubuntu runner
+  builds both images and runs the Docker-tagged tests. A hard gate fails the check on any NotRun.
+- `Test.InContainer` and the `incontainer` job print `wall=<s>s`, from the `duration_s` the in-container
+  run already wrote.
+- `tests/CiCoverage.Tests.ps1`: red before the fix (0 passed, 4 failed), green after.
+
+**Tested:** passed=169 failed=0 skipped=6 - in-container, `pwsh 7.6.6`, Pester 6.1.0, uid 1001,
+`unjustified_skips` empty. **In-container suite wall time: 33.5s** (`Test.InContainer` at `c7b2dee`;
+the task took 39.3s with container start). `scripts/ci/Invoke-Tests.ps1` locally, as CI runs it:
+total=196 passed=193 failed=0 skipped=3 **notrun=0**, 90s. The Docker-tagged tests needed no new skip.
+
+**Failed:** none.
+
+**Missing:**
+
+- The Docker-tagged tests still cannot run inside the image: there is no docker daemon there. They run
+  in the `pester` check instead, which is where the packet asked for them.
+- `src/LedgerReceipt.ps1` still ships with no caller (I12 PR 5).
+
+**Blockers:**
+
+- **No signing key.** Not touched. Identity is operator-asserted.
+- **Command-hook timeout fails open.** Not touched. 15s PreToolUse, Claude Code semantics.
+- The receipt-append export blocker was struck on 2026-09-23 at seq 9 and is not relisted.
+
+**Ledger head hash:** `33a77e42c7a9f230735561fdbcd3abe28df294abb4d92671b0bffde536bd123a`
+(shape checked, not value.)
+
+**Assessment hash:** `798b10ee3ca2d64b28bc779611484ddc0565448c6468ae2ddaf54a53a98030a3`
+- canonical sha256 of `prompts/assessment.2026-09-21.json`, unchanged and re-verified by `Bootstrap`.
+
+**Forensic chain:** decision before any edit at seq 36 (`docker-tests-in-ci`). `Goal.Update` appends its
+own `verification` record.
+
 ## 2026-09-23 f470895 run-01
 
 I12 PR 3, `feature/ci-on-main`: after a merge into main, automerge dispatches `ci.yml` on main.

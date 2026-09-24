@@ -91,9 +91,10 @@ task Test.InContainer Build.Image, {
     }
     $summary = Get-Content -LiteralPath $summaryPath -Raw -Encoding utf8 | ConvertFrom-Json
 
-    Write-Build Cyan ("Container: passed={0} failed={1} skipped={2} (pwsh {3}, Pester {4}, uid {5})" -f
+    Write-Build Cyan ("Container: passed={0} failed={1} skipped={2} wall={6}s (pwsh {3}, Pester {4}, uid {5})" -f
         $summary.passed, $summary.failed, $summary.skipped,
-        $summary.ps_version, $summary.pester_version, $summary.uid)
+        $summary.ps_version, $summary.pester_version, $summary.uid,
+        $(if ($summary.PSObject.Properties.Name -contains 'duration_s') { $summary.duration_s } else { '?' }))
     Write-Build Cyan ("Ledger head: {0}" -f $summary.ledger_head)
 
     # The container gate already decided which skips were justified; this end reports
