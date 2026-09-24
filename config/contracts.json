@@ -15,15 +15,15 @@
     {
       "id": "sentinel",
       "status": "known",
-      "consumes": ["gated tool list", "PreToolUse stdin payload", "LEASH_MODE", "LEDGER_PRINCIPAL"],
+      "consumes": ["gated tool list", "PreToolUse stdin payload", "LEASH_MODE", "LEDGER_PRINCIPAL", "config/sentinel.json", "hooks/policy.ps1"],
       "emits": ["hookSpecificOutput.permissionDecision plus exit code", "one Ledger receipt per decision"],
       "gates": "the tool call",
       "evidence": [
-        "hooks/sentinel.ps1:73 gated tool list",
-        "hooks/sentinel.ps1 Exit-Closed is the only exit-2 path",
-        "tests/Sentinel.Tests.ps1:68 Enforce, :141 Observe, :164 fails closed"
+        "hooks/sentinel.ps1:94 gated tool list, passed to hooks/policy.ps1",
+        "hooks/sentinel.ps1 Exit-Denied: every non-allow path is a receipted deny; Exit-Unreceipted is the only exit-2 path",
+        "tests/Sentinel.Tests.ps1:137 Enforce, :210 Observe, :233 fails closed (THE FALSIFIER: reason=timeout)"
       ],
-      "notes": "Deny is hookSpecificOutput.permissionDecision on stdout with exit 0. Allow and Observe emit an empty object. Every internal failure is stderr plus exit 2 with empty stdout. One script, one -Mode switch, both images; there is deliberately no second copy."
+      "notes": "Deny is hookSpecificOutput.permissionDecision on stdout with exit 0. An explicit allow verdict and Observe emit an empty object. Every other path is a deny body on exit 0 with a receipt whose model ends /deny:<reason>; only a receipt that cannot be written is stderr plus exit 2 with empty stdout. One script, one -Mode switch, both images; there is deliberately no second copy."
     },
     {
       "id": "ledger",
@@ -60,9 +60,9 @@
   "exceptions": [
     {
       "id": "hook-timeout-fails-open",
-      "statement": "A command hook that exceeds its timeout fails open. The PreToolUse timeout is 15s in both managed-settings.json files. A sentinel that hangs is a sentinel that is not consulted.",
+      "statement": "A command hook that exceeds its timeout fails open. The PreToolUse timeout is 15s in both managed-settings.json files. Narrowed in I14 PR 4, not closed: the sentinel denies at config/sentinel.json timeout_ms (5000) if the policy step has not answered, and the config test holds timeout_ms plus 5000 ms of headroom inside the 15s. What remains open is a sentinel that cannot even start - pwsh launch plus Ledger import - inside 15s.",
       "status": "accepted",
-      "evidence": "Claude Code hook semantics; managed-settings.json timeout 15"
+      "evidence": "Claude Code hook semantics; managed-settings.json timeout 15; config/sentinel.json timeout_ms; tests/SentinelConfig.Tests.ps1"
     },
     {
       "id": "identity-operator-asserted",

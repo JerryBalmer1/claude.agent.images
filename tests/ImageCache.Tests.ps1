@@ -111,7 +111,8 @@ Describe 'Get-ImageInputHash' {
         $sources | Should -Contain 'src/'
         $sources | Should -Contain 'entrypoint.ps1'
         $sources | Should -Contain 'vendor/claude.agent.core/modules/ledger/python/'
-        $sources.Count | Should -Be 8
+        $sources | Should -Contain 'config/sentinel.json'
+        $sources.Count | Should -Be 9
     }
 }
 

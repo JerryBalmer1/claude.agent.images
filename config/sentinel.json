@@ -1,0 +1,6 @@
+{
+  "schema": "claude.agent.sentinel/1",
+  "timeout_ms": 5000,
+  "fail_mode": "closed",
+  "policy": "policy.ps1"
+}

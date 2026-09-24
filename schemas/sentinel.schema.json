@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "claude.agent.sentinel/1",
+  "title": "hooks/sentinel.ps1 configuration",
+  "description": "config/sentinel.json. fail_mode has exactly one legal value: the sentinel fails closed, and 'open' is not a value this schema admits. timeout_ms is the sentinel's own deadline for the policy step; its maximum leaves 5000 ms of the host's 15 s hook timeout, which fails open, for pwsh start, the Ledger import and the receipt.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [ "schema", "timeout_ms", "fail_mode", "policy" ],
+  "properties": {
+    "schema": { "const": "claude.agent.sentinel/1" },
+    "timeout_ms": { "type": "integer", "minimum": 1, "maximum": 10000 },
+    "fail_mode": { "enum": [ "closed" ] },
+    "policy": { "type": "string", "minLength": 1 }
+  }
+}
