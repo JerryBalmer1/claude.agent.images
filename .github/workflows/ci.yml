@@ -17,9 +17,15 @@ on:
     branches: [develop, main]
   push:
     branches: [develop, main]
+  # Automerge dispatches this on main after a promotion: its merge is a GITHUB_TOKEN push, which
+  # starts no workflow, and workflow_dispatch is the exception. trailer-guard and branch-flow are
+  # pull_request-only and report skipped on a dispatch.
+  workflow_dispatch:
 
 permissions:
   contents: read
+  # tests/CiOnMain.Tests.ps1 lists ci runs for a commit through the Actions API.
+  actions: read
 
 jobs:
   requires-header:

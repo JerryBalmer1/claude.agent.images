@@ -5,7 +5,7 @@
 #   origin file   : scripts/Invoke-AutoMerge.ps1
 #   origin commit : 912c1c9eb48ab0b639d257bc7b10661d7212f985
 #   origin sha256 : b3c9716326dd26d433f56e7c09d26a3b4afdd4ae4a5b2fbecf81165dd054beb8
-#   adapted here  : comments only - byte-identical at copy time; the origin repository's name was
+#   adapted here  : YES - 2026-09-24 (I12): dispatches ci on main after a merge; earlier, the origin's name was
 #                   removed from these comments on 2026-09-24 (public hygiene, I12)
 #
 # There is no submodule here and the origin does not follow this copy. If the origin's
@@ -194,4 +194,10 @@ if ($deleteBranch) { $mergeArgs += '--delete-branch' }
 & gh @mergeArgs
 
 Write-Step "merged #$($pr.number)"
+
+# A push made with GITHUB_TOKEN starts no workflow, so without this the merge commit on main has
+# no ci run. workflow_dispatch is exempt. See Invoke-CiDispatchOnMain in AutoMerge.Lib.ps1.
+$dispatch = Invoke-CiDispatchOnMain -Repo $Repo -BaseRef $pr.baseRefName -Config $config
+if ($dispatch.Dispatched) { Write-Step "dispatched ci.yml on $($dispatch.Ref)" }
+else { Write-Step "no ci dispatch: base '$($pr.baseRefName)' is not main" }
 exit 0
