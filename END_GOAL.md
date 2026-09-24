@@ -10,6 +10,113 @@ fails the build rather than being believed.
 
 ---
 
+## 2026-09-23 d6c54cb run-01
+
+Six governance items every packet since #1 had walked past, decided rather than
+deferred again. One decision record, seq 12, covering all six.
+
+**Changed:**
+
+- **`docs/plans/ACTIVE.md` retired; the stale-plan STOP reinstated with a reading.**
+  The file had been in the tree since the birth commit `f1aeb60`, naming
+  `feature/env-local` from two features ago. `AGENTS.md` row 2 suspended the STOP
+  because "ACTIVE.md does not exist here" - false from birth. The row now reads: no
+  `ACTIVE.md` means no active plan, a legal state, and the STOP fires only when the
+  file exists and names a branch other than the current one. It names the four pull
+  requests that walked past it - #1 `b03aa76`, #2 `66a78d6`, #3 `3e47c9e`,
+  #4 `bcd8fa4`. `scripts/state.ps1` printed the opposite reading and is corrected;
+  `AGENTS.md:24-31` and `FLOW.md:187-188` are deliberately not edited, because the
+  disagreement table is where a reading lives.
+- **The frozen-plans justification retired; the rule in force given a test.**
+  `tests/Repo.Tests.ps1` excluded `docs/plans/` as FROZEN RECORDS "covered by a
+  HASHES.txt". No HASHES.txt is tracked in this repository at all; the only one
+  reachable is in `vendor/claude.agent.core` at pin `a68664e` and covers nine
+  artefacts belonging to core. Nor are plans frozen here - `e221ddb` edited four
+  plan sites. The rule actually in force is now asserted rather than asserted-about:
+  a plan may be annotated in past tense with a date, original measurements
+  preserved. Eight recorded measurements are pinned; a changed number fails, a dated
+  annotation does not. The `^docs/plans/` exclusion itself stays, because
+  `ASSESSMENT.md:406` carries the pre-move path.
+- **The D7 `Add-LedgerReceipt` objection: open in core, closed in images.** Measured
+  at pin `a68664e6b9938773478d967348b590f487fe2443`: the name exists in neither tree
+  and core exports the raw `Add-LedgerRecord` at `ledger.psd1:9`. A wrapper over a
+  Ledger export is Ledger API; this repository consumes core and adds none, so the
+  objection stops reading as an unmet obligation of this tree. No wrapper written,
+  core untouched.
+- **Clause (b) of promotion written into the README.** It is the exit code of
+  `Invoke-Build Test.InContainer`, not the suite tally inside it: at `3e47c9e` the
+  container reported `passed=150 failed=0 skipped=2` and the task still exited 1.
+  The README had no definition of done at all, so the section was created to hold
+  the rule.
+- **`scripts/state.ps1` runs here.** The guard pinned the origin to
+  `claude.pwsh.image.builder` and exited 1 in this repository, which is why every
+  state block since birth was hand-assembled. No name list replaces it: the origin
+  is read and printed, and what is asserted is that the work tree being reported on
+  is the work tree this copy of the script lives in. Falsified from another clone:
+  exit 1, both paths named.
+- **`scripts/ci/Test-PushGuard.ps1:44`** named `config/trailer-grandfather.txt`; the
+  file is at `.continuity/trailer-grandfather.txt`. Comment only. The provenance
+  header three lines up claimed byte-identical-at-copy-time, which that edit
+  falsifies, so it moves to adapted=YES and says what the difference is.
+
+**Tested:** passed=151 failed=0 skipped=2 - in-container, `pwsh 7.6.6`, Pester 6.1.0,
+uid 1001, total 174, 34.76s, `unjustified_skips` empty and both real skips reported
+as `no-exempt-commit-in-range`. Host `Test.Unit`: passed=172 failed=0 skipped=2
+NotRun=0 Inconclusive=0. Host `tests/run.ps1` (Pester 5.7.1): 172 passed, 0 failed,
+2 skipped. One test added this run - the plan-annotation rule - which is the whole
+of the 171 to 172 and 150 to 151 movement.
+
+**Failed:** none.
+
+**Missing:**
+
+- The skip-justification gate is still not in the CI required set. That is I7, the
+  next pull request on this branch line, and `config/repo.json -> required_checks`
+  is untouched here.
+- CI still cannot run the in-container suite. `vendor/claude.agent.core` is a private
+  submodule and `actions/checkout` needs a PAT passed as `token:` - FINDING-M17,
+  Jerry to create. The Ledger-tagged tests stay `NotRun` on the runner.
+- `config/repo.json -> repo` still reads `JerryBalmer1/claude.pwsh.image.builder`.
+  Stale in the same way `state.ps1` was, and not fixed here: it is an input to the
+  `generated-match-config` check and changing it is its own decision. Listed.
+- **The repository is PUBLIC.** `AGENTS.md` says "Never make this repo public".
+  `state.ps1` prints the warning on every run now that it runs at all. Not an agent
+  decision to reverse; listed loudly.
+- The README still carries pre-birth wreckage the clause-(b) section sits beside: a
+  `Test.FailFirst` row for a task that was deleted, a `docker run` example passing
+  `LEDGER_HOOK_ARM=1` that `AGENTS.md` forbids (disagreement row 4), and a
+  `.agents/BREADCRUMBS.md` that does not exist. Row 4 already says the README is
+  wrong; this run added a section rather than rebuilding the file.
+
+**Blockers:**
+
+- **No signing key.** Not touched. `actor` and `LEDGER_PRINCIPAL` are
+  operator-asserted and are places to be caught lying, not signatures.
+- **Command-hook timeout fails open.** Not touched. The 15s PreToolUse timeout is
+  Claude Code semantics; a sentinel that hangs is a sentinel that is not consulted.
+- The receipt-append export blocker was struck on 2026-09-23 at seq 9 and is not
+  relisted; see the 2026-09-21 section for its history.
+
+**Ledger head hash:** `841c9dd4a2968a4ae7851bdf74a7c0c083ffe174a5fe9fda00728a685fec8742`
+(receipts at `output/ledger/ledger.jsonl`, written by the sentinel baked into the
+image. It moves on every `Test.InContainer`, so `Goal.Update` checks its shape, not
+its value.)
+
+**Assessment hash:** `798b10ee3ca2d64b28bc779611484ddc0565448c6468ae2ddaf54a53a98030a3`
+- canonical sha256 of `prompts/assessment.2026-09-21.json`, unchanged by this run and
+re-verified by `Bootstrap`.
+
+**Forensic chain:** the decision was recorded BEFORE any edit, at seq 12,
+`kind=decision`, `subject=tidy-before-promotion-six-items`, `prev 41aafeb2`,
+`self a0a3ce9e`. `Goal.Update` appends its own `verification` record at the end of
+this run, so this run adds two records.
+
+**Falsified, not asserted.** The new plan-annotation test was driven both ways with
+scratch edits to `docs/plans/2026-09-21-oneshot/END_GOAL.DRAFT.md`, each reverted and
+the tree verified clean: `passed=109` rewritten to `passed=110` gave exit 1 naming the
+file and the value, and a dated past-tense annotation appended to the same file gave
+exit 0. The rewritten `state.ps1` guard was driven red from another clone.
+
 ## 2026-09-23 5d48942 run-01
 
 The skip-justification gate and the conditional skip stop colliding.
@@ -250,16 +357,26 @@ wrote it and it is history now - at vendor pin `a68664e` the name IS in `Functio
 written; this note is where the correction lives, because editing an attributed section to
 agree with a later fact is how a record stops being one.
 
-One objection that travelled with that claim is NOT settled, and is not quietly dropped
-here. The earlier text cited "the compliance plan's D7" for it: exporting the function raw
-means a receipt can be appended with no validated output behind it, so the decision was
-`Add-LedgerReceipt`, a constrained wrapper, rather than the raw function. **That plan file
-is not in this tree** - `docs/plans/` was pruned to code-named files at birth (forensic
-seq 1), and `git grep` finds no D7 here - so the citation is carried, not verifiable from
-this repository. What IS measurable: `Add-LedgerReceipt` exists in neither this tree nor
-`vendor/claude.agent.core` at `a68664e`; upstream exported the raw `Add-LedgerRecord`. The
-objection therefore stands unmet. What changed is only that the sentinel depends on a
-public name instead of a private one, which is a smaller claim than the wrapper asked for.
+One objection that travelled with that claim is NOT settled upstream, and is not quietly
+dropped here. The earlier text cited "the compliance plan's D7" for it: exporting the
+function raw means a receipt can be appended with no validated output behind it, so the
+decision was `Add-LedgerReceipt`, a constrained wrapper, rather than the raw function.
+**That plan file is not in this tree** - `docs/plans/` was pruned to code-named files at
+birth (forensic seq 1), and `git grep` finds no D7 here - so the citation is carried, not
+verifiable from this repository. What IS measurable, re-measured 2026-09-23 at vendor pin
+`a68664e6b9938773478d967348b590f487fe2443`: `Add-LedgerReceipt` exists in neither this tree
+nor `vendor/claude.agent.core` - `git grep` returns nothing in core, and here it returns
+only the two prose lines in this note - while core exports the raw `Add-LedgerRecord` as one
+of five names at `modules/ledger/ledger.psd1:9`.
+
+**Where it stands, decided 2026-09-23: OPEN IN CORE, CLOSED IN IMAGES.** A wrapper over a
+Ledger export is Ledger API, and this repository consumes core rather than adding to it -
+there is no place here to put an `Add-LedgerReceipt` that would not immediately belong to
+core. So the objection stops being carried as an unmet obligation of THIS tree, which is how
+the line above used to read, and is carried instead as an open objection against core at the
+pin named. No wrapper is written here and core is not touched. What this repository did change
+is smaller and is not offered as meeting the objection: the sentinel depends on a public name
+instead of a private one. Forensic chain seq 12, `tidy-before-promotion-six-items`.
 
 ## 2026-09-21 — Grok review of oneshot (this file created on origin)
 
