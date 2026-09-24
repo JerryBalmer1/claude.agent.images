@@ -3,6 +3,27 @@
 Defects found in this repository: what they did, what caused them, and what catches them now. Each
 one points at its forensic record and, where one exists, the decision in `DECISIONS.md`. Newest first.
 
+## I14-F2 - the image input hash reads working-tree bytes, so line endings change it
+
+- **What it did.** In I14 PR 4 the same commit, `ac72829`, gave two input hashes for the leash image: `9707b49add1d`,
+  then `60fb6a430292` after `git checkout 017d476` and back. No content changed. The checkout rewrote the new files with
+  CRLF, because this clone has `core.autocrlf` on, and `Get-ImageInputHash` (`build/Build.Helpers.psm1`) hashes the bytes on
+  disk, which `COPY` then ships.
+- **Consequence.** An image built on this Windows clone and one built in CI (Linux, LF) from the same commit have different
+  labels and different bytes. The suite passed on both, since pwsh reads either ending. But "same commit, same image" isn't
+  true across machines.
+- **Not fixed.** It's outside I14's list. The candidate fix is to hash and copy the index's bytes (`git ls-files --eol` or
+  `git archive` as the build context), and that is a build change for its own PR.
+
+## I14-F1 - the core submodule is not replaced by a release fetch
+
+- **What stands.** Both images copy the Ledger module from `vendor/claude.agent.core`, a git submodule pinned in
+  `config/vendor.json` and checked by `scripts/Bootstrap-Clean.ps1` and `tests/Bootstrap.Tests.ps1`. The packet names a
+  release fetch as the alternative and records it as a finding, not an attempt.
+- **What a fetch needs that core lacks.** Core has cut no release (`v0.2.1 is not cut`, `config/contracts.json`). There is
+  no release asset to fetch, so nothing publishes a digest to verify a fetch against. Until both exist, the submodule's
+  gitlink is the only content-addressed pin available.
+
 ## I13-F2 - automerge goes red after it merges into main and dispatches ci
 
 - **What it did.** Automerge run 35964076759 merged the I13 promotion (#30, `8231263`), dispatched `ci` on `main`

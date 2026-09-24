@@ -1,0 +1,10 @@
+{
+  "schema": "claude.agent.vendor/1",
+  "submodules": [
+    {
+      "path": "vendor/claude.agent.core",
+      "url": "https://github.com/JerryBalmer1/claude.agent.core.git",
+      "pin": "4d34c9a71249a6dbcf433799450d91eb22131899"
+    }
+  ]
+}
