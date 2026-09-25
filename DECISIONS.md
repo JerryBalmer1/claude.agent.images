@@ -22,8 +22,13 @@ M-findings, and the five pre-images forensic records (`FINDINGS.md`). This entry
 **Why not carried.** They are transcripts of runs on a tree that isn't this one. A copy here would put evidence next
 to code it doesn't describe, and readers take a file's location as a claim about what it covers. The `HASHES` file
 pins bytes in the directory it sits in, so moving the set would also detach it from what it hashes. The permalinks
-cite the bytes where they were written. `FINDINGS.md` F99 records the cost: that repository is private, so the links
-don't resolve for the public.
+cite the bytes where they were written.
+
+**The permalinks 404 for the public, and that is intended.** `gh repo view JerryBalmer1/claude.pwsh.image.builder`
+answered `PRIVATE` on 2026-09-24, and archiving keeps a repository private. The retired repositories are archived
+private by Jerry's decision. A public reader gets a 404, and anyone with access gets the exact bytes. This is recorded
+as a property of the citations, not as a finding: nothing is wrong. (R1 PR 3 first filed it as finding F99, and it
+was withdrawn before merge. F99 is unused.)
 
 **`docs/POLICY.md`, reviewed line by line against image.builder's at `5f71173`.** `git diff --no-index` gives 3
 insertions and 1 deletion. This file is generated from `config/repo.json`, so the review decides which side's config

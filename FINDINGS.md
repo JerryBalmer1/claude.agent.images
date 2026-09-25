@@ -3,20 +3,6 @@
 Defects found in this repository: what they did, what caused them, and what catches them now. Each
 one points at its forensic record and, where one exists, the decision in `DECISIONS.md`. Newest first.
 
-## F99 - the permalinks that replace image.builder paths resolve only for accounts that can read a private repository
-
-Numbered after core's F98.
-
-- **What it is.** R1 PR 3 replaces every citation of a file that exists only in `claude.pwsh.image.builder` with a
-  permalink at `5f71173`: the eight in `docs/plans/BACKLOG.md`, the eight M-findings and the five records below. That
-  repository is retiring. Measured 2026-09-24: `gh repo view JerryBalmer1/claude.pwsh.image.builder --json
-  visibility,isArchived` answers `PRIVATE`, `false`. This repository is public.
-- **Consequence.** A reader without access to the private repository gets a 404 from every one of those links. The
-  citation is still exact. It names a commit and a path that can't move, and anyone with access can follow it. But it
-  is not readable evidence for the public. Archiving, which is the retirement step, keeps a repository private.
-- **Not fixed.** Two ways to make the links public: publish the archive, or copy the cited bytes into this tree.
-  Publishing needs its own hygiene pass. Copying is what the decision below declines. Both are Jerry's call.
-
 ## Carried from image.builder: the cleanup findings nothing here cites
 
 `claude.pwsh.image.builder` kept its own findings for the 2026-09-21 cleanup, M1 to M17, in
