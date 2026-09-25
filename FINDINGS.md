@@ -3,6 +3,56 @@
 Defects found in this repository: what they did, what caused them, and what catches them now. Each
 one points at its forensic record and, where one exists, the decision in `DECISIONS.md`. Newest first.
 
+## F99 - the permalinks that replace image.builder paths resolve only for accounts that can read a private repository
+
+Numbered after core's F98.
+
+- **What it is.** R1 PR 3 replaces every citation of a file that exists only in `claude.pwsh.image.builder` with a
+  permalink at `5f71173`: the eight in `docs/plans/BACKLOG.md`, the eight M-findings and the five records below. That
+  repository is retiring. Measured 2026-09-24: `gh repo view JerryBalmer1/claude.pwsh.image.builder --json
+  visibility,isArchived` answers `PRIVATE`, `false`. This repository is public.
+- **Consequence.** A reader without access to the private repository gets a 404 from every one of those links. The
+  citation is still exact. It names a commit and a path that can't move, and anyone with access can follow it. But it
+  is not readable evidence for the public. Archiving, which is the retirement step, keeps a repository private.
+- **Not fixed.** Two ways to make the links public: publish the archive, or copy the cited bytes into this tree.
+  Publishing needs its own hygiene pass. Copying is what the decision below declines. Both are Jerry's call.
+
+## Carried from image.builder: the cleanup findings nothing here cites
+
+`claude.pwsh.image.builder` kept its own findings for the 2026-09-21 cleanup, M1 to M17, in
+[`image.builder@5f71173:docs/plans/2026-09-21-cleanup/FINDINGS.md`](https://github.com/JerryBalmer1/claude.pwsh.image.builder/blob/5f711736e028f0078d8b32b732ec37cb224258be/docs/plans/2026-09-21-cleanup/FINDINGS.md)
+at `5f71173`. That file never came into this tree. Nine of the seventeen are cited from a live repository: M4, M6,
+M7, M8, M13 and M17 here, and M1 to M3 in the docs vault. The eight below were cited nowhere, measured 2026-09-24 with
+`git grep -nwE '(FINDING-)?M<n>'` over core, images and tools at `origin/develop` and over the vault. Each one is carried
+as a link and a status measured against `origin/develop` at `15ee3c4`. The text stays where it was written.
+
+| Finding | What it recorded | Status here |
+|---|---|---|
+| [M5](https://github.com/JerryBalmer1/claude.pwsh.image.builder/blob/5f711736e028f0078d8b32b732ec37cb224258be/docs/plans/2026-09-21-cleanup/FINDINGS.md#L104-L108) | two diff counts, 92 and 46, were of different pairs, and neither corrects the other | **closed**. A record about two numbers, with nothing to fix |
+| [M9](https://github.com/JerryBalmer1/claude.pwsh.image.builder/blob/5f711736e028f0078d8b32b732ec37cb224258be/docs/plans/2026-09-21-cleanup/FINDINGS.md#L155-L184) | a Pester title with `<name>` and no `-ForEach` threw under strict mode; that suite had never run in CI | **fixed, carried**. The title is `.env.ANYNAME.local is ignored` at `tests/Env.Tests.ps1:81` |
+| [M10](https://github.com/JerryBalmer1/claude.pwsh.image.builder/blob/5f711736e028f0078d8b32b732ec37cb224258be/docs/plans/2026-09-21-cleanup/FINDINGS.md#L186-L227) | git refused the bind-mounted `/work` as dubious ownership; `-c` and `GIT_CONFIG_COUNT` can't carry `safe.directory` | **fixed, carried**. `build/container.gitconfig` is passed as `GIT_CONFIG_GLOBAL` at `build/tasks/Test.build.ps1:80`, and baked into neither image |
+| [M11](https://github.com/JerryBalmer1/claude.pwsh.image.builder/blob/5f711736e028f0078d8b32b732ec37cb224258be/docs/plans/2026-09-21-cleanup/FINDINGS.md#L229-L251) | `scripts/env.ps1` identified the repository by its folder name | **fixed, carried**. `scripts/env.ps1:73` resolves the root from `$PSScriptRoot` |
+| [M12](https://github.com/JerryBalmer1/claude.pwsh.image.builder/blob/5f711736e028f0078d8b32b732ec37cb224258be/docs/plans/2026-09-21-cleanup/FINDINGS.md#L253-L268) | the in-container count was 138, not the 109 the run order expected; a test assumed `LEASH_REQUIRE_CLAUDE` unset | **closed**. The count is history, and the test fix is carried: `tests/Entrypoint.Tests.ps1:237` clears the variable explicitly |
+| [M14](https://github.com/JerryBalmer1/claude.pwsh.image.builder/blob/5f711736e028f0078d8b32b732ec37cb224258be/docs/plans/2026-09-21-cleanup/FINDINGS.md#L288-L312) | the CI port dropped three guards: docker build smoke, annotated tags only, hadolint | **partly open**. Docker build is restored by the `images` and `incontainer` jobs (`.github/workflows/ci.yml:71`, `:135`). Annotated tags are reported by `scripts/state.ps1:300` and enforced by no check. hadolint is open: `.hadolint.yaml` is tracked and nothing runs it |
+| [M15](https://github.com/JerryBalmer1/claude.pwsh.image.builder/blob/5f711736e028f0078d8b32b732ec37cb224258be/docs/plans/2026-09-21-cleanup/FINDINGS.md#L314-L350) | the automerge that reads its config from the base can't merge the PR that introduces that config, and a 404 crashed it | **fixed, carried**. `Get-RepoConfigAtRef` returns `$null` on a failed read (`scripts/AutoMerge.Lib.ps1:101`, `:106`). The bootstrap cost is permanent by design |
+| [M16](https://github.com/JerryBalmer1/claude.pwsh.image.builder/blob/5f711736e028f0078d8b32b732ec37cb224258be/docs/plans/2026-09-21-cleanup/FINDINGS.md#L352-L376) | CI checked out no submodule, and the failures read as product defects | **fixed, carried**. `submodules: recursive` at `.github/workflows/ci.yml:76`, `:115` and `:150` |
+
+## Pre-images chain: image.builder's five forensic records
+
+`claude.pwsh.image.builder` kept a forensic chain of five records before this repository was born. They are **not**
+entries on this repository's chain, which starts at its own seq 1 and does not link to them. They are listed so that a
+reader who finds one of these subjects cited somewhere can find the record. The bytes are
+[`.continuity/forensic.jsonl` lines 1-5](https://github.com/JerryBalmer1/claude.pwsh.image.builder/blob/5f711736e028f0078d8b32b732ec37cb224258be/.continuity/forensic.jsonl#L1-L5)
+at `5f71173`, and the last `self` is that chain's tip.
+
+| seq | ts | kind | subject | self |
+|---|---|---|---|---|
+| 1 | 2026-09-21T09:37:45Z | verification | `run-01-goal-update-06e738d` | `a476fdfdfd48f655af413d2057e8ff4f58966aa7f653f64963500f724706a140` |
+| 2 | 2026-09-21T10:00:13Z | finding | `oneshot-2026-09-21-shapes-frozen` | `052d2db70d48a10111de147ffb105dada7eff07f725e57a0064bebfaa44c1035` |
+| 3 | 2026-09-21T10:33:19Z | verification | `grok-fabricated-ship-report-confession-verified` | `8bfbf75adaf99911b32609c10636ec62f8cc831914aa6209ece54a229ae2d8fd` |
+| 4 | 2026-09-21T10:33:20Z | finding | `grok-review-next-slice-would-reintroduce-version-drift` | `69988f482ff43949b648e686474c9fd8578dcc4eae5770ee149c2d23a346cf75` |
+| 5 | 2026-09-21T10:33:20Z | finding | `root-cause-run-01-was-never-pushed` | `23e04995f13b29b729ee86eff2d1542e6a4e9739f83b68c95764ae7c31727761` |
+
 ## F97 - one commit, one machine, two input hashes: the key reads untracked files in the vendored Ledger
 
 Numbered after core's F96, as Jerry directed. It isn't in the `I14-Fn` series.

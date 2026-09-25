@@ -13,10 +13,10 @@ verified against `scripts/state.ps1` rather than copied from the prompt.
 ## Queue
 
 - [x] 00 — .env.local: credentials outside the tree, loaded in one line
-      prompt: docs/plans/backlog/00-env-local.md
-      plan:   docs/plans/2026-09-21-env-local.md — executed, PR #6, awaiting merge
+      prompt: [docs/plans/backlog/00-env-local.md](https://github.com/JerryBalmer1/claude.pwsh.image.builder/blob/5f711736e028f0078d8b32b732ec37cb224258be/docs/plans/backlog/00-env-local.md) (image.builder@5f71173)
+      plan:   [docs/plans/2026-09-21-env-local.md](https://github.com/JerryBalmer1/claude.pwsh.image.builder/blob/5f711736e028f0078d8b32b732ec37cb224258be/docs/plans/2026-09-21-env-local.md) (image.builder@5f71173) — executed, PR #6, awaiting merge
 - [ ] 01 — container proof: vendor the siblings, .build.ps1, the parking rule
-      prompt: docs/plans/backlog/01-container-proof.md
+      prompt: [docs/plans/backlog/01-container-proof.md](https://github.com/JerryBalmer1/claude.pwsh.image.builder/blob/5f711736e028f0078d8b32b732ec37cb224258be/docs/plans/backlog/01-container-proof.md) (image.builder@5f71173)
       the big one. Makes the image real and proves the deny gate from inside a container.
 - [ ] reconcile main and develop — they are two incompatible layouts
       Not a numbered plan; found 2026-09-21 while diagnosing PR #5. origin/main carries
@@ -30,7 +30,8 @@ verified against `scripts/state.ps1` rather than copied from the prompt.
       run there.
       Merging PR #5 as-is unions both layouts: two Dockerfiles, two sentinel hooks, two
       plan systems, two skill systems, and one AGENTS.md resolved by hand. That breaks
-      .ALLAGENTS.md's "one skill system". The AGENTS.md conflict is add/add.
+      [.ALLAGENTS.md](https://github.com/JerryBalmer1/claude.pwsh.image.builder/blob/5f711736e028f0078d8b32b732ec37cb224258be/.ALLAGENTS.md)'s
+      "one skill system" (image.builder@5f71173). The AGENTS.md conflict is add/add.
       Note main's build is designed red: Plan.Check throws because src/PlanValidator.ps1
       does not exist, and Test.FailFirst throws unless its own test fails. Scaffolding,
       not a working build.
@@ -38,10 +39,10 @@ verified against `scripts/state.ps1` rather than copied from the prompt.
       writes .build.ps1 in main's Invoke-Build shape (root .build.ps1 dispatching to
       build/tasks/*.build.ps1) so this reconciliation is a merge, not a third rewrite.
 - [ ] 02 — agents and skills
-      prompt: docs/plans/backlog/02-agents-and-skills.md
+      prompt: [docs/plans/backlog/02-agents-and-skills.md](https://github.com/JerryBalmer1/claude.pwsh.image.builder/blob/5f711736e028f0078d8b32b732ec37cb224258be/docs/plans/backlog/02-agents-and-skills.md) (image.builder@5f71173)
       01 goes first: .agents/ and the vault are worth nothing until the container is real.
 - [ ] 03 — pretty obsidian skills
-      prompt: docs/plans/backlog/03-pretty-obsidian-skills.md
+      prompt: [docs/plans/backlog/03-pretty-obsidian-skills.md](https://github.com/JerryBalmer1/claude.pwsh.image.builder/blob/5f711736e028f0078d8b32b732ec37cb224258be/docs/plans/backlog/03-pretty-obsidian-skills.md) (image.builder@5f71173)
 - [x] Pro upgrade — not needed for this repository; the limit was private-only
       Probed 2026-09-21: all six repos returned 403 "Upgrade to GitHub Pro or make this
       repository public" on /rulesets and on /branches/main/protection. The message names
@@ -53,13 +54,13 @@ verified against `scripts/state.ps1` rather than copied from the prompt.
       PR required, 0 approvals, force-push and deletion off, admins not enforced.
       Still true for the five private siblings, which is not this backlog's business.
 - [ ] 04 — accountability as code: terraform, rulesets, signing
-      prompt: docs/plans/backlog/04-accountability-iac.md
+      prompt: [docs/plans/backlog/04-accountability-iac.md](https://github.com/JerryBalmer1/claude.pwsh.image.builder/blob/5f711736e028f0078d8b32b732ec37cb224258be/docs/plans/backlog/04-accountability-iac.md) (image.builder@5f71173)
       No longer blocked on Pro here: rulesets and branch protection are available, and
       protection on main already exists by hand, so 04 codifies a live setting rather
       than inventing one. The other dependency this line used to name, .build.ps1, has
       been in the tree since the birth commit f1aeb60 - measured 2026-09-23.
 - [ ] archive and tag the operating-protocol plan
-      docs/plans/2026-09-20-operating-protocol.md merged in PR #4 and was never archived
+      [docs/plans/2026-09-20-operating-protocol.md](https://github.com/JerryBalmer1/claude.pwsh.image.builder/blob/5f711736e028f0078d8b32b732ec37cb224258be/docs/plans/2026-09-20-operating-protocol.md) (image.builder@5f71173) merged in PR #4 and was never archived
       or tagged. That is row 7 of AFTER-CLAUDE-COMMITS.md:
       `pwsh -NoProfile -File scripts/snake.ps1 -Archive -Go -Pr 4 -Ci green`
       Housekeeping, not a feature. Can run at any point.
