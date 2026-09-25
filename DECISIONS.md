@@ -3,6 +3,45 @@
 Decisions that change what this repository keeps, and why. Each one points at the forensic record
 that carries its evidence. Newest first.
 
+## 2026-09-24 - image.builder is cited at 5f71173, and its evidence set stays there
+
+**Context.** `claude.pwsh.image.builder` is retiring (packet R1). Its `origin/develop` tip is `5f71173`, and every
+file this tree cited from it has a permalink there now: the eight in `docs/plans/BACKLOG.md`, the eight uncited
+M-findings, and the five pre-images forensic records (`FINDINGS.md`). This entry records what is **not** carried.
+
+**Decision.** These are archived at `5f71173` and are not copied into this tree:
+
+- The grok evidence set: GROK-CONFESSION-VERIFIED.md, GROK-REVIEW.md and HASHES.grok-confession.txt in
+  `image.builder@5f71173:docs/plans/2026-09-21-oneshot/`,
+  [browsable here](https://github.com/JerryBalmer1/claude.pwsh.image.builder/tree/5f711736e028f0078d8b32b732ec37cb224258be/docs/plans/2026-09-21-oneshot).
+  The pre-images records seq 3 and seq 4 are the chain entries that attest to it.
+- The four run transcripts 01-red-before-implementation.txt, 02-green-after-implementation.txt,
+  03-planted-twins.txt and 04-final-green.txt in `image.builder@5f71173:tests/evidence/`,
+  [browsable here](https://github.com/JerryBalmer1/claude.pwsh.image.builder/tree/5f711736e028f0078d8b32b732ec37cb224258be/tests/evidence).
+
+**Why not carried.** They are transcripts of runs on a tree that isn't this one. A copy here would put evidence next
+to code it doesn't describe, and readers take a file's location as a claim about what it covers. The `HASHES` file
+pins bytes in the directory it sits in, so moving the set would also detach it from what it hashes. The permalinks
+cite the bytes where they were written.
+
+**The permalinks 404 for the public, and that is intended.** `gh repo view JerryBalmer1/claude.pwsh.image.builder`
+answered `PRIVATE` on 2026-09-24, and archiving keeps a repository private. The retired repositories are archived
+private by Jerry's decision. A public reader gets a 404, and anyone with access gets the exact bytes. This is recorded
+as a property of the citations, not as a finding: nothing is wrong. (R1 PR 3 first filed it as finding F99, and it
+was withdrawn before merge. F99 is unused.)
+
+**`docs/POLICY.md`, reviewed line by line against image.builder's at `5f71173`.** `git diff --no-index` gives 3
+insertions and 1 deletion. This file is generated from `config/repo.json`, so the review decides which side's config
+governs. Nothing is edited.
+
+| Line | This tree | image.builder | Verdict |
+|---|---|---|---|
+| title | `# Policy - JerryBalmer1/claude.agent.images` | `# Policy - JerryBalmer1/claude.pwsh.image.builder` | **adopt this tree's**. It names this repository. The other names the one retiring |
+| required checks | `- images` | (absent) | **adopt**. The job at `.github/workflows/ci.yml:71` builds both images, and it is the docker build smoke whose loss image.builder's M14 recorded |
+| required checks | `- incontainer` | (absent) | **adopt**. The job at `.github/workflows/ci.yml:135` runs the suite inside the built images |
+
+Forensic chain seq 53.
+
 ## 2026-09-24 - The sentinel fails closed on every path that is not an explicit allow
 
 **Context.** `hooks/sentinel.ps1` failed closed on stdin it could not parse and on a ledger it could
