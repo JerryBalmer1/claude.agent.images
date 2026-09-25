@@ -117,6 +117,89 @@ Describe 'Get-ImageInputHash' {
     }
 }
 
+Describe 'New-ImageContext builds from git, not the working tree (F97)' {
+    # A sandbox repository with a real submodule, so the gitlink path is the one exercised: F97's
+    # two .pyc files were untracked in the VENDORED folder, which git archive of the superproject
+    # never reaches. core.autocrlf=true in the outer clone, as on this Windows machine (I14-F2).
+    BeforeAll {
+        $script:FBox = New-LeashSandbox
+        $git = @('-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'protocol.file.allow=always', '-c', 'init.defaultBranch=main')
+        $sub = Join-Path $script:FBox.Root 'sub'
+        $script:Outer = Join-Path $script:FBox.Root 'outer'
+        $null = New-Item -ItemType Directory -Path (Join-Path $sub 'py'), $script:Outer
+        $null = git -C $sub @git init -q 2>&1
+        [System.IO.File]::WriteAllText((Join-Path $sub 'py' 'one.py'), "x = 1`n")
+        [System.IO.File]::WriteAllText((Join-Path $sub '.gitignore'), "__pycache__/`n")
+        $null = git -C $sub @git add -A 2>&1
+        $null = git -C $sub @git commit -q -m sub 2>&1
+        $null = git -C $script:Outer @git init -q 2>&1
+        $null = git -C $script:Outer config core.autocrlf true
+        [System.IO.File]::WriteAllText((Join-Path $script:Outer 'a.txt'), "a`n")
+        [System.IO.File]::WriteAllText((Join-Path $script:Outer 'Dockerfile'), "FROM scratch`nCOPY vendor/sub/py/ /x/`nCOPY a.txt /y`n")
+        $null = git -C $script:Outer @git submodule add -q $sub vendor/sub 2>&1
+        $null = git -C $script:Outer @git add -A 2>&1
+        $null = git -C $script:Outer @git commit -q -m outer 2>&1
+        # checkout rewrites only a file that is missing, so a.txt goes first and comes back CRLF.
+        Remove-Item -LiteralPath (Join-Path $script:Outer 'a.txt')
+        $null = git -C $script:Outer @git checkout -q -- a.txt 2>&1
+
+        $script:HashOf = {
+            $c = New-ImageContext -RepositoryRoot $script:Outer
+            try { [pscustomobject]@{ Hash = Get-ImageInputHash -ContextRoot $c -Dockerfile (Join-Path $c 'Dockerfile')
+                                     Files = @(Get-ChildItem -LiteralPath $c -Recurse -File -Force | ForEach-Object { [System.IO.Path]::GetRelativePath($c, $_.FullName).Replace('\', '/') } | Sort-Object -CaseSensitive)
+                                     A = [System.IO.File]::ReadAllBytes((Join-Path $c 'a.txt')) } }
+            finally { Remove-ImageContext -Path $c }
+        }
+        $script:Clean = & $script:HashOf
+    }
+
+    AfterAll { Remove-Item -LiteralPath $script:FBox.Root -Recurse -Force -ErrorAction SilentlyContinue }
+
+    It 'exports HEAD and the submodule at its gitlink, and nothing else' {
+        $script:Clean.Files | Should -Be @('.gitmodules', 'a.txt', 'Dockerfile', 'vendor/sub/.gitignore', 'vendor/sub/py/one.py')
+    }
+
+    It 'exports LF where the clone checked out CRLF' {
+        [System.IO.File]::ReadAllBytes((Join-Path $script:Outer 'a.txt')) | Should -Be @(0x61, 0x0D, 0x0A) -Because 'the precondition: this clone is autocrlf'
+        $script:Clean.A | Should -Be @(0x61, 0x0A)
+    }
+
+    It 'does not see an untracked or ignored file in the vendored folder, nor an uncommitted edit; the hash is unchanged' {
+        $pyc = Join-Path $script:Outer 'vendor' 'sub' 'py' '__pycache__'
+        $null = New-Item -ItemType Directory -Path $pyc
+        [System.IO.File]::WriteAllText((Join-Path $pyc 'one.cpython-310.pyc'), 'ignored')
+        [System.IO.File]::WriteAllText((Join-Path $script:Outer 'vendor' 'sub' 'py' 'stray.py'), 'untracked')
+        [System.IO.File]::WriteAllText((Join-Path $script:Outer 'a.txt'), "edited, not committed`n")
+        try {
+            # The precondition: the working-tree hash does see them. Without this the test passes on a no-op.
+            Get-ImageInputHash -ContextRoot $script:Outer -Dockerfile (Join-Path $script:Outer 'Dockerfile') |
+                Should -Not -Be $script:Clean.Hash
+            $after = & $script:HashOf
+            $after.Files | Should -Be $script:Clean.Files
+            $after.Hash | Should -Be $script:Clean.Hash
+        }
+        finally {
+            Remove-Item -LiteralPath $pyc, (Join-Path $script:Outer 'vendor' 'sub' 'py' 'stray.py') -Recurse -Force
+            $null = git -C $script:Outer checkout -q -- a.txt 2>&1
+        }
+    }
+
+    It 'refuses a submodule that is not checked out' {
+        $null = git -C $script:Outer submodule deinit -q -f vendor/sub 2>&1
+        try { { New-ImageContext -RepositoryRoot $script:Outer } | Should -Throw '*vendor/sub is not checked out*' }
+        finally { $null = git -C $script:Outer -c protocol.file.allow=always submodule update -q --init 2>&1 }
+    }
+
+    It 'is what Build.Image and the CI cache key build and hash from' {
+        $tasks = Get-Content -LiteralPath (Join-Path $script:RepoRoot 'build' 'tasks' 'Images.build.ps1') -Raw
+        ([regex]::Matches($tasks, 'New-ImageContext -RepositoryRoot \$Build\.RepositoryRoot')).Count | Should -Be 2
+        $tasks | Should -Not -Match '-ContextRoot \$(root|Build\.RepositoryRoot)'
+        $cache = Get-Content -LiteralPath (Join-Path $script:RepoRoot 'scripts' 'ci' 'Invoke-ImageCache.ps1') -Raw
+        $cache | Should -Match 'New-ImageContext -RepositoryRoot \$RepoRoot'
+        $cache | Should -Not -Match '-ContextRoot \$RepoRoot'
+    }
+}
+
 Describe 'CI builds the images once per run, from the cache' {
     It 'has an images job that saves the images only on a cache miss' {
         $images = Get-JobBlock 'images'

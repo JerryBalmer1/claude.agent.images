@@ -187,10 +187,14 @@ Describe 'Image builds and runs correctly' -Tag 'Docker' {
         # Through Invoke-ImageBuild, as Build.Image builds them: an image already carrying the label
         # for these exact inputs is reused, which is how CI's cached images reach this test without
         # a rebuild or apt (I13 PR 3).
+        # From HEAD's export, as Build.Image builds them (F97): the working tree is not an input.
         Import-Module (Join-Path $script:RepoRoot 'build' 'Build.Helpers.psm1') -Force
-        $script:BuildLeash = Invoke-ImageBuild -ContextRoot $script:RepoRoot -Dockerfile $script:LeashDockerfile -Tag $script:LeashTag -Quiet
-        $script:BuildDev = Invoke-ImageBuild -ContextRoot $script:RepoRoot -Dockerfile $script:DevDockerfile -Tag $script:DevTag -Quiet
+        $script:Ctx = New-ImageContext -RepositoryRoot $script:RepoRoot
+        $script:BuildLeash = Invoke-ImageBuild -ContextRoot $script:Ctx -Dockerfile (Join-Path $script:Ctx 'Dockerfile') -Tag $script:LeashTag -Quiet
+        $script:BuildDev = Invoke-ImageBuild -ContextRoot $script:Ctx -Dockerfile (Join-Path $script:Ctx 'images' 'developer' 'Dockerfile') -Tag $script:DevTag -Quiet
     }
+
+    AfterAll { if ($script:Ctx) { Remove-ImageContext -Path $script:Ctx } }
 
     It 'builds the leash image' {
         $script:BuildLeash.ExitCode | Should -Be 0 -Because $script:BuildLeash.Output
@@ -204,11 +208,11 @@ Describe 'Image builds and runs correctly' -Tag 'Docker' {
         @{ Tag = 'claude.pwsh.image.leash:run-01'; File = 'Dockerfile' }
         @{ Tag = 'claude.pwsh.image.developer:run-01'; File = 'images/developer/Dockerfile' }
     ) {
-        $df = Join-Path $script:RepoRoot $File
-        $hash = Get-ImageInputHash -ContextRoot $script:RepoRoot -Dockerfile $df
+        $df = Join-Path $script:Ctx $File
+        $hash = Get-ImageInputHash -ContextRoot $script:Ctx -Dockerfile $df
         $label = Invoke-Docker -Arguments @('image', 'inspect', '--format', '{{ index .Config.Labels "org.leash.inputs" }}', $Tag)
         $label.StdOut.Trim() | Should -Be $hash
-        $again = Invoke-ImageBuild -ContextRoot $script:RepoRoot -Dockerfile $df -Tag $Tag -Quiet
+        $again = Invoke-ImageBuild -ContextRoot $script:Ctx -Dockerfile $df -Tag $Tag -Quiet
         $again.ExitCode | Should -Be 0
         $again.Reused | Should -BeTrue -Because 'nothing it reads changed since the build above'
     }
