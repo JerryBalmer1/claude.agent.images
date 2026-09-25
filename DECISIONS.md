@@ -3,6 +3,36 @@
 Decisions that change what this repository keeps, and why. Each one points at the forensic record
 that carries its evidence. Newest first.
 
+## 2026-09-24 - images build from a git export of HEAD, and the input hash is taken over it (F97)
+
+**Context.** F97: one commit on one machine gave two input hashes, because `Get-ImageInputHash` and `docker build`
+both read the working tree, and two ignored `__pycache__/*.pyc` files sat in the vendored Ledger's `python/`.
+
+**Decision.** `New-ImageContext` (`build/Build.Helpers.psm1`) exports HEAD with `git archive`, and each gitlink in
+HEAD's tree from its submodule at the recorded commit, into a temporary directory. `Build.Image.Leash`,
+`Build.Image.Developer`, `Invoke-ImageCache.ps1 -Step Key` and the Docker-tagged block of `tests/Image.Tests.ps1`
+build and hash from that directory, and nothing builds from the repository root. `Get-ImageInputHash` is unchanged.
+Its context moved.
+
+- **HEAD, not the index.** The packet asks for a build from an archive of HEAD and a hash from the index. With both
+  taken from HEAD, the hash is over the bytes that are built. With the hash taken from the index, a staged but
+  uncommitted change would be hashed and not built. On a clean tree the two are the same. Build first, commit second
+  is the one workflow this changes: an uncommitted file is not in the image.
+- **`core.autocrlf=false` on the archive.** `git archive` applies checkout's line-ending conversion, so a Windows
+  clone would export CRLF where CI exports LF. That is I14-F2, and this closes it too. The `eol=` rules in
+  `.gitattributes` still apply, and they give the same bytes everywhere.
+- **A submodule that is not checked out is a refusal.** An export with a hole in it is not a context.
+
+**Evidence, measured at `57d1f63`.** With an untracked `f97-probe.py` dropped into
+`vendor/claude.agent.core/modules/ledger/python/` beside the two ignored `.pyc` files, the export hash was leash
+`305d6983a4a750487aa75594591cec3c5df1a2c5d6e4c29bc261f4668578ee1b` before and after. The working-tree hash moved from
+`44976343b9c1…` (F97's working-clone value) to `22c94f792b5a…`. A build from the export, labelled `305d6983a4a7`,
+held exactly the five tracked files under `/opt/leash/ledger/python/`. The control, built the pre-change way from
+the working tree, held eight: the probe and both `.pyc` files. That makes F97's "likely shipped" a measurement. A
+fresh clone of `57d1f63` (also `autocrlf=true`) exports leash `305d6983a4a7` and developer `858fb715da1e`, the same as
+the working clone. The build ran without `--pull`, because registry-1.docker.io timed out from this machine. The
+base and apt layers came from cache, and every COPY layer read the export.
+
 ## 2026-09-24 - image.builder is cited at 5f71173, and its evidence set stays there
 
 **Context.** `claude.pwsh.image.builder` is retiring (packet R1). Its `origin/develop` tip is `5f71173`, and every
