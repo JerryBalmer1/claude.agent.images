@@ -64,6 +64,12 @@ Numbered after core's F96, as Jerry directed. It isn't in the `I14-Fn` series.
   If so, a local image can carry bytes that no commit names.
 - **Not fixed.** Jerry's direction for I14 is to record it. The candidate fixes are to exclude `__pycache__/` in
   `.dockerignore` and in the key, or to build from the index (as in I14-F2).
+- **Fixed in I15 PR 1** (added 2026-09-24, text above unchanged). The images build from a `git archive` of HEAD, plus
+  the core submodule at its gitlink, and the input hash is taken over that export. The "likely shipped" above was
+  then measured: a build from the working tree shipped the two `.pyc` files and a planted probe. The export
+  shipped none of them, and its hash didn't move. See `DECISIONS.md` 2026-09-24, *images build from a git export of
+  HEAD*. Caught now by `tests/ImageCache.Tests.ps1`, *New-ImageContext builds from git, not the working tree (F97)*.
+  The same change closes I14-F2.
 
 ## I14-F2 - the image input hash reads working-tree bytes, so line endings change it
 
@@ -76,6 +82,9 @@ Numbered after core's F96, as Jerry directed. It isn't in the `I14-Fn` series.
   true across machines.
 - **Not fixed.** It's outside I14's list. The candidate fix is to hash and copy the index's bytes (`git ls-files --eol` or
   `git archive` as the build context), and that is a build change for its own PR.
+- **Fixed in I15 PR 1** (added 2026-09-24). The build context is a `git archive` of HEAD under `core.autocrlf=false`
+  (F97), so every clone exports the same bytes. Tested under `autocrlf=true` in `tests/ImageCache.Tests.ps1`, *exports
+  LF where the clone checked out CRLF*.
 
 ## I14-F1 - the core submodule is not replaced by a release fetch
 

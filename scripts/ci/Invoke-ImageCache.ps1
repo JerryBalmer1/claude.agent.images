@@ -9,7 +9,8 @@
     failed on DNS for it. ci.yml now has an `images` job, and this script is each of its steps:
 
       -Step Key    The cache key: sha256 over both images' Get-ImageInputHash, which covers each
-                   Dockerfile, .dockerignore and every file their COPY lines read. Written to
+                   Dockerfile, .dockerignore and every file their COPY lines read, as HEAD holds
+                   them (New-ImageContext; F97), not as the working tree does. Written to
                    GITHUB_OUTPUT as `key`. The same inputs on any commit give the same key.
       -Step Build  On a cache miss only: Invoke-Build Build.Image, then docker save of every image
                    carrying the org.leash.inputs label to output/image-cache/images.tar, which
@@ -46,8 +47,13 @@ Import-Module (Join-Path $RepoRoot 'build' 'Build.Helpers.psm1') -Force
 
 switch ($Step) {
     'Key' {
-        $leash = Get-ImageInputHash -ContextRoot $RepoRoot -Dockerfile (Join-Path $RepoRoot 'Dockerfile')
-        $dev   = Get-ImageInputHash -ContextRoot $RepoRoot -Dockerfile (Join-Path $RepoRoot 'images' 'developer' 'Dockerfile')
+        # From HEAD's export, the context Build.Image builds from (F97), so the key and the label agree.
+        $ctx = New-ImageContext -RepositoryRoot $RepoRoot
+        try {
+            $leash = Get-ImageInputHash -ContextRoot $ctx -Dockerfile (Join-Path $ctx 'Dockerfile')
+            $dev   = Get-ImageInputHash -ContextRoot $ctx -Dockerfile (Join-Path $ctx 'images' 'developer' 'Dockerfile')
+        }
+        finally { Remove-ImageContext -Path $ctx }
         $key   = 'leash-images-' + (Get-StringSha256 -Text "leash $leash`ndeveloper $dev")
         Write-Host "image-cache: key $key (leash inputs $($leash.Substring(0, 12)), developer inputs $($dev.Substring(0, 12)))"
         if ($env:GITHUB_OUTPUT) { Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value "key=$key" -Encoding utf8 }

@@ -19,28 +19,38 @@
     Both go through Invoke-ImageBuild (build/Build.Helpers.psm1), which skips the build when the
     tag already carries the label for these exact inputs. That is what lets CI load the images
     job's cached images and run no apt after it (I13 PR 3).
+
+    The context is not the working tree. New-ImageContext exports HEAD, and the core submodule
+    at its gitlink, into a temporary directory, and the build and its input hash both read that
+    (F97). An untracked or uncommitted file is not in the image; commit it first.
 #>
 
 # Synopsis: Build the enforcing leash image.
 task Build.Image.Leash {
-    $root = $Build.RepositoryRoot
-    $file = Join-Path $root 'Dockerfile'
-    Write-Build Cyan "Building $($Build.LeashTag) ..."
-    $r = Invoke-ImageBuild -ContextRoot $root -Dockerfile $file -Tag $Build.LeashTag -NoCache:$Build.NoCache
-    if ($r.ExitCode -ne 0) { throw "docker build failed for $($Build.LeashTag), exit $($r.ExitCode)" }
+    $ctx = New-ImageContext -RepositoryRoot $Build.RepositoryRoot
+    try {
+        $file = Join-Path $ctx 'Dockerfile'
+        Write-Build Cyan "Building $($Build.LeashTag) from HEAD ..."
+        $r = Invoke-ImageBuild -ContextRoot $ctx -Dockerfile $file -Tag $Build.LeashTag -NoCache:$Build.NoCache
+        if ($r.ExitCode -ne 0) { throw "docker build failed for $($Build.LeashTag), exit $($r.ExitCode)" }
+    }
+    finally { Remove-ImageContext -Path $ctx }
     Write-Build Green "Built $($Build.LeashTag)"
 }
 
 # Synopsis: Build the observing developer image.
 task Build.Image.Developer {
-    $root = $Build.RepositoryRoot
-    $file = Join-Path $root 'images' 'developer' 'Dockerfile'
-    if (-not (Test-Path -LiteralPath $file)) {
-        throw "Developer Dockerfile missing: $file"
+    $ctx = New-ImageContext -RepositoryRoot $Build.RepositoryRoot
+    try {
+        $file = Join-Path $ctx 'images' 'developer' 'Dockerfile'
+        if (-not (Test-Path -LiteralPath $file)) {
+            throw "Developer Dockerfile missing from HEAD: images/developer/Dockerfile"
+        }
+        Write-Build Cyan "Building $($Build.DeveloperTag) from HEAD ..."
+        $r = Invoke-ImageBuild -ContextRoot $ctx -Dockerfile $file -Tag $Build.DeveloperTag -NoCache:$Build.NoCache
+        if ($r.ExitCode -ne 0) { throw "docker build failed for $($Build.DeveloperTag), exit $($r.ExitCode)" }
     }
-    Write-Build Cyan "Building $($Build.DeveloperTag) ..."
-    $r = Invoke-ImageBuild -ContextRoot $root -Dockerfile $file -Tag $Build.DeveloperTag -NoCache:$Build.NoCache
-    if ($r.ExitCode -ne 0) { throw "docker build failed for $($Build.DeveloperTag), exit $($r.ExitCode)" }
+    finally { Remove-ImageContext -Path $ctx }
     Write-Build Green "Built $($Build.DeveloperTag)"
 }
 

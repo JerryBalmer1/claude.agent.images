@@ -460,6 +460,71 @@ function Get-ImageInputHash {
     Get-StringSha256 -Text ($entries -join "`n")
 }
 
+function New-ImageContext {
+    <#
+    .SYNOPSIS
+        A build context made from git's objects: HEAD's tree, and each submodule at the commit
+        HEAD's gitlink names. Returns the path of a new directory; Remove-ImageContext removes it.
+
+    .DESCRIPTION
+        F97: the working tree is not a build input. Built from the repository root, the images
+        took whatever sat on disk, and two untracked __pycache__/*.pyc files in the vendored
+        Ledger changed one commit's input hash on one machine and, likely, shipped. An archive of
+        HEAD cannot see an untracked, ignored or unstaged file, so neither the hash nor COPY can.
+
+        git archive does not descend into submodules, so each gitlink in HEAD's tree is archived
+        from its own repository at the commit HEAD records, under its own path. A submodule that
+        is not checked out is a refusal, not a context with a hole in it.
+
+        core.autocrlf=false: git archive applies checkout's conversions, so without it a Windows
+        clone exports CRLF where CI exports LF (I14-F2). The eol attributes in .gitattributes still
+        apply, and they apply the same way on every machine.
+
+        Extraction is System.Formats.Tar, not tar: bsdtar and GNU tar read `C:\...` differently.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$RepositoryRoot,
+        [string]$Revision = 'HEAD'
+    )
+
+    $root = (Resolve-Path -LiteralPath $RepositoryRoot).ProviderPath
+    $dest = Join-Path ([System.IO.Path]::GetTempPath()) ('leash-ctx-' + [guid]::NewGuid().ToString('n').Substring(0, 12))
+    $tar = "$dest.tar"
+    $conv = @('-c', 'core.autocrlf=false', '-c', 'core.eol=lf')
+    $null = New-Item -ItemType Directory -Path $dest
+    try {
+        & git -C $root @conv archive --format=tar -o $tar $Revision
+        [System.Formats.Tar.TarFile]::ExtractToDirectory($tar, $dest, $false)
+
+        foreach ($line in @(& git -C $root ls-tree -r $Revision)) {
+            if ($line -notmatch '^160000 commit ([0-9a-f]{40})\t(.+)$') { continue }
+            $sha, $path = $Matches[1], $Matches[2]
+            $sub = Join-Path $root $path
+            $top = if (Test-Path -LiteralPath (Join-Path $sub '.git')) { (& git -C $sub rev-parse --show-toplevel).Trim() }
+            if (-not $top -or [System.IO.Path]::GetFullPath($top) -ne [System.IO.Path]::GetFullPath($sub)) {
+                throw "submodule $path is not checked out; run git submodule update --init"
+            }
+            & git -C $sub @conv archive --format=tar --prefix="$path/" -o $tar $sha
+            [System.Formats.Tar.TarFile]::ExtractToDirectory($tar, $dest, $true)
+        }
+    }
+    catch {
+        Remove-ImageContext -Path $dest
+        throw
+    }
+    finally {
+        Remove-Item -LiteralPath $tar -Force -ErrorAction SilentlyContinue
+    }
+    $dest
+}
+
+function Remove-ImageContext {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Path)
+    if (Test-Path -LiteralPath $Path) { [System.IO.Directory]::Delete($Path, $true) }
+}
+
 function Invoke-ImageBuild {
     <#
     .SYNOPSIS
@@ -511,4 +576,5 @@ function Invoke-ImageBuild {
 Export-ModuleMember -Function 'ConvertTo-CanonicalObject', 'ConvertTo-CanonicalJson',
     'Get-StringSha256', 'Get-CanonicalJsonSha256', 'Test-AssessmentHash',
     'Get-SkipJustification', 'Assert-SuiteClean', 'Get-SuiteLoadFailure',
-    'Get-ImageCopySource', 'Get-ImageInputHash', 'Invoke-ImageBuild'
+    'Get-ImageCopySource', 'Get-ImageInputHash', 'New-ImageContext', 'Remove-ImageContext',
+    'Invoke-ImageBuild'
